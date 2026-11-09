@@ -13,6 +13,8 @@ The design goals and full specification live in [SPEC.md](./SPEC.md).
 - **Tap** for a short plucked note.
 - **Press and drag** for a sustained tone that glides as you move.
 - **Multi-touch** plays several notes at once.
+- Turn on **Scale lines** in the settings to draw a faint guide line at every
+  step of the current scale.
 - Open the gear icon for presets, scales, snap strength, and the short-axis
   assignment.
 

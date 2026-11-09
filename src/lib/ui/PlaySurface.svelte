@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Player, type ActiveTouch, type SurfaceGeometry } from '../input/player';
+  import { scaleLines } from '../mapping/scaleLines';
   import type { Settings } from '../state/schema';
 
   let { settings }: { settings: Settings } = $props();
@@ -65,6 +66,33 @@
       ctx.fillRect(0, 0, laneThickness, height);
     } else {
       ctx.fillRect(0, height - laneThickness, width, laneThickness);
+    }
+
+    // Scale guide lines: one per step of the current scale, so the player can
+    // see where the notes are. Opacity 0 hides them entirely.
+    if (settings.scaleLines > 0.01) {
+      const lines = scaleLines(
+        { baseMidi: settings.baseMidi, octaveSpan: settings.octaveSpan },
+        settings.scale,
+      );
+      ctx.lineWidth = 1 * dpr;
+      for (const line of lines) {
+        const alpha = settings.scaleLines * (line.isTonic ? 1 : 0.6);
+        ctx.strokeStyle = line.isTonic
+          ? `rgba(170, 215, 255, ${alpha})`
+          : `rgba(150, 190, 235, ${alpha})`;
+        ctx.beginPath();
+        if (vertical) {
+          const py = (1 - line.pos) * height;
+          ctx.moveTo(0, py);
+          ctx.lineTo(width, py);
+        } else {
+          const px = (1 - line.pos) * width;
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, height);
+        }
+        ctx.stroke();
+      }
     }
 
     // Active glow: a soft radial following each held finger.

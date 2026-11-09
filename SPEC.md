@@ -320,7 +320,11 @@ surface stays "near blank"; the instrument is heard, not read.
 - **Pitch indicator:** a thin lane/line on the long axis marking current pitch, plus
   a small note-name label (updates live, including the snapped note when snapping
   is on).
-- **Optional tuner tick:** faint marks at scale degrees when `snapStrength > 0.5`.
+- **Scale lines:** faint guide lines across the short axis at every step of the
+  chosen scale, so the notes are visible before you play them. Opacity is a
+  setting (`scaleLines`, 0 = hidden). The tonic of each octave is drawn a little
+  stronger than the other degrees. Placement reuses the pitch mapping, so a line
+  sits exactly where that note sounds.
 - Respect `prefers-reduced-motion`: disable expanding ripples, keep a static glow.
 
 ---
@@ -427,7 +431,7 @@ Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 
 Settings panel: scale, base note, octave span, snap strength slider (with a clear
 "0 = free glide" marker), short-axis selector, preset selector, master volume,
-reverb, polyphony, haptics toggle.
+reverb, scale-line opacity, polyphony, haptics toggle.
 
 ---
 

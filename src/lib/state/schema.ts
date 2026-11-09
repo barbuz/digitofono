@@ -30,6 +30,8 @@ export interface Settings {
   shortAxis: ShortAxisId;
   volume: number;
   reverbAmount: number;
+  /** Opacity (0..1) of the guide lines drawn at each scale step; 0 hides them. */
+  scaleLines: number;
   polyphony: number;
   preset: PresetId;
   haptics: boolean;
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shortAxis: 'timbre',
   volume: 0.8,
   reverbAmount: 0.12,
+  scaleLines: 0,
   polyphony: 8,
   preset: 'warm',
   haptics: true,

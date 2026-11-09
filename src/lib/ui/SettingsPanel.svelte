@@ -18,7 +18,7 @@
     })),
   ).flat();
 
-  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'polyphony') {
+  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'scaleLines' | 'polyphony') {
     return (event: Event) => {
       const value = Number((event.currentTarget as HTMLInputElement).value);
       updateSettings({ [field]: value });
@@ -129,6 +129,19 @@
         step="0.02"
         value={settings.reverbAmount}
         oninput={handleNumber('reverbAmount')}
+      />
+    </label>
+
+    <label>
+      Scale lines: {Math.round(settings.scaleLines * 100)}%
+      <span class="hint">guide lines at each scale step; 0 hides them</span>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        value={settings.scaleLines}
+        oninput={handleNumber('scaleLines')}
       />
     </label>
 
