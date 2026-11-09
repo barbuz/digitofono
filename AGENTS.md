@@ -28,6 +28,9 @@ verified on a real device.
   `src/lib/mapping/` and must stay framework-free and unit-tested.
 - The audio engine (`src/lib/audio/`) must not import Svelte. It is driven by
   plain method calls from `src/lib/input/player.ts`.
+- Keep canvas visuals' timing maths in small pure modules (for example
+  `src/lib/ui/ripple.ts`) so they can be unit-tested without a canvas; the
+  Svelte component should only draw what those functions return.
 - Never set an `AudioParam` to a new value instantly; use `setTargetAtTime` or a
   ramp. Instant changes cause audible clicks. The one exception is note onset,
   where `setValueAtTime` is correct.

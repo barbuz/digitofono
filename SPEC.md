@@ -313,15 +313,20 @@ When a parameter is not the short axis, it is set by the preset:
 Single canvas, `requestAnimationFrame` loop, DPR-aware (cap 2×). Dim palette so the
 surface stays "near blank"; the instrument is heard, not read.
 
-- **Touch ripple:** expanding, fading ring at each pointerdown position
-  (radius 0→~80 px over ~450 ms, alpha 0.5→0).
+- **Touch marker:** a ring at each pointerdown position that expands over
+  ~160 ms to a fixed ~24 px radius, then holds that size and fades out. It
+  deliberately lingers (default 2.5 s, tunable via `rippleDecay`) so the last
+  notes played stay visible as a reference for returning to them; a slower fade
+  must therefore lengthen the linger, not the expansion, or the ring would grow
+  to swallow the surface.
 - **Active glow:** soft radial gradient following each held finger, brightness
   proportional to voice activity.
 - **Pitch indicator:** a thin lane/line on the long axis marking current pitch, plus
   a small note-name label (updates live, including the snapped note when snapping
   is on).
 - **Optional tuner tick:** faint marks at scale degrees when `snapStrength > 0.5`.
-- Respect `prefers-reduced-motion`: disable expanding ripples, keep a static glow.
+- Respect `prefers-reduced-motion`: skip the expansion (marker appears at full
+  size), keep a static glow.
 
 ---
 
@@ -427,7 +432,8 @@ Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 
 Settings panel: scale, base note, octave span, snap strength slider (with a clear
 "0 = free glide" marker), short-axis selector, preset selector, master volume,
-reverb, polyphony, haptics toggle.
+reverb, marker fade (`rippleDecay`, how long touch markers linger), polyphony,
+haptics toggle.
 
 ---
 

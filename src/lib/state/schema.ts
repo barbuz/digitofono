@@ -30,6 +30,8 @@ export interface Settings {
   shortAxis: ShortAxisId;
   volume: number;
   reverbAmount: number;
+  /** How long a touch marker lingers on the surface, in seconds. */
+  rippleDecay: number;
   polyphony: number;
   preset: PresetId;
   haptics: boolean;
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shortAxis: 'timbre',
   volume: 0.8,
   reverbAmount: 0.12,
+  rippleDecay: 2.5,
   polyphony: 8,
   preset: 'warm',
   haptics: true,
