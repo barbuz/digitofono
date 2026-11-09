@@ -10,6 +10,7 @@ import type { Preset } from '../state/schema';
  */
 export class AudioEngine {
   private ctx: AudioContext | null = null;
+  private readonly createContext: () => AudioContext;
   private voiceBus: GainNode | null = null;
   private masterGain: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
@@ -22,6 +23,10 @@ export class AudioEngine {
   private preset: Preset = PRESETS.warm;
   private waveDark: PeriodicWave | null = null;
   private waveBright: PeriodicWave | null = null;
+
+  constructor(createContext: () => AudioContext = defaultContext) {
+    this.createContext = createContext;
+  }
 
   get context(): AudioContext | null {
     return this.ctx;
@@ -36,7 +41,7 @@ export class AudioEngine {
   }
 
   private init(): void {
-    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    const ctx = this.createContext();
     this.ctx = ctx;
 
     this.voiceBus = ctx.createGain();
@@ -108,7 +113,7 @@ export class AudioEngine {
   allocate(): Voice | null {
     if (!this.ctx || !this.voiceBus || !this.waveDark || !this.waveBright) return null;
 
-    const free = this.pool.find((v) => !v.active && this.ctx!.currentTime >= v.freeAt);
+    const free = this.pool.find((v) => v.reusable);
     if (free) return free;
 
     if (this.pool.length < this.maxVoices) {
@@ -117,9 +122,10 @@ export class AudioEngine {
       return voice;
     }
 
-    const victim = this.pool.find((v) => v.active);
+    // Steal the oldest active voice so a new note is never silently dropped.
+    const victim = this.pool.find((v) => v.active) ?? this.pool[0] ?? null;
     if (victim) victim.release(false);
-    return victim ?? null;
+    return victim;
   }
 
   get currentWaveDark(): PeriodicWave | null {
@@ -133,4 +139,8 @@ export class AudioEngine {
   get currentPreset(): Preset {
     return this.preset;
   }
+}
+
+function defaultContext(): AudioContext {
+  return new AudioContext({ latencyHint: 'interactive' });
 }

@@ -31,6 +31,16 @@ verified on a real device.
 - Never set an `AudioParam` to a new value instantly; use `setTargetAtTime` or a
   ramp. Instant changes cause audible clicks. The one exception is note onset,
   where `setValueAtTime` is correct.
+- `OscillatorNode` and `AudioBufferSourceNode` are single-use: once stopped they
+  can never be started again. `Voice` therefore builds its node graph in
+  `start()` and discards it in `release()`. Never cache oscillators on a pooled
+  voice and restart them; that throws `InvalidStateError` and silently loses a
+  note.
+- `Player.pointerDown` must stay synchronous. It initialises the AudioContext
+  synchronously and only fires the `resume()` promise in the background, so the
+  touch is registered before a fast `pointerup` can arrive. Awaiting the context
+  here reintroduces a bug where the first tap is lost and its voice sounds
+  forever.
 - Keep the default scale `chromatic` and the default short axis `timbre` unless
   the spec changes.
 

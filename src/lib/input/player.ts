@@ -47,16 +47,22 @@ export interface PlayerEvents {
  * press was short. Owns the touch bookkeeping the visuals read from.
  */
 export class Player {
-  private engine = new AudioEngine();
+  private engine: AudioEngine;
   private touches = new Map<number, TouchState>();
   private settings: Settings;
   private geometry: SurfaceGeometry;
   private events: PlayerEvents;
 
-  constructor(settings: Settings, geometry: SurfaceGeometry, events: PlayerEvents = {}) {
+  constructor(
+    settings: Settings,
+    geometry: SurfaceGeometry,
+    events: PlayerEvents = {},
+    engine: AudioEngine = new AudioEngine(),
+  ) {
     this.settings = settings;
     this.geometry = geometry;
     this.events = events;
+    this.engine = engine;
     this.applySettings(settings);
   }
 
@@ -111,8 +117,12 @@ export class Player {
     return midiToNoteName(midi);
   }
 
-  async pointerDown(pointerId: number, x: number, y: number): Promise<void> {
-    await this.engine.ensureRunning();
+  pointerDown(pointerId: number, x: number, y: number): void {
+    // Build the context synchronously so the touch state is registered before
+    // any pointerup can arrive; the resume promise is deliberately not awaited,
+    // otherwise a fast tap on a cold context would be lost and leave an
+    // unreleased voice sounding forever.
+    this.engine.ensureRunning().catch(() => {});
 
     const { pitchPos, shortPos } = this.toAxes(x, y);
     const preset = PRESETS[this.settings.preset];
@@ -121,6 +131,13 @@ export class Player {
 
     const voice = this.engine.allocate();
     if (!voice || !this.engine.currentWaveDark || !this.engine.currentWaveBright) return;
+
+    // The pool may have handed us a voice that another finger still holds
+    // (voice stealing when polyphony is exhausted). Drop that stale touch so
+    // the old finger cannot keep steering the new note.
+    for (const [otherId, other] of this.touches) {
+      if (other.voice === voice) this.touches.delete(otherId);
+    }
 
     voice.start({
       preset,
