@@ -18,7 +18,7 @@
     })),
   ).flat();
 
-  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'rippleDecay' | 'polyphony') {
+  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'polyphony') {
     return (event: Event) => {
       const value = Number((event.currentTarget as HTMLInputElement).value);
       updateSettings({ [field]: value });
@@ -129,19 +129,6 @@
         step="0.02"
         value={settings.reverbAmount}
         oninput={handleNumber('reverbAmount')}
-      />
-    </label>
-
-    <label>
-      Marker fade: {settings.rippleDecay.toFixed(1)}s
-      <span class="hint">how long tap markers linger</span>
-      <input
-        type="range"
-        min="0"
-        max="8"
-        step="0.5"
-        value={settings.rippleDecay}
-        oninput={handleNumber('rippleDecay')}
       />
     </label>
 

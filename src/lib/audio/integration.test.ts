@@ -22,7 +22,6 @@ const settings: Settings = {
   shortAxis: 'timbre',
   volume: 0.8,
   reverbAmount: 0.12,
-  rippleDecay: 2.5,
   polyphony: 8,
   preset: 'warm',
   haptics: false,

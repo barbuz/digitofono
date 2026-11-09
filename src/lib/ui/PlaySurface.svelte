@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Player, type ActiveTouch, type SurfaceGeometry } from '../input/player';
-  import { rippleVisual, rippleAlive, EXPAND_MS } from './ripple';
   import type { Settings } from '../state/schema';
 
   let { settings }: { settings: Settings } = $props();
@@ -82,30 +81,17 @@
       ctx.fill();
     }
 
-    // Touch markers: expand quickly, then linger so the last-played notes stay
-    // visible as a reference.
-    const decayMs = settings.rippleDecay * 1000;
-    ripples = ripples.filter((r) => rippleAlive(now - r.start, decayMs));
+    // Touch ripples: expanding, fading rings.
+    ripples = ripples.filter((r) => now - r.start < 450);
     for (const ripple of ripples) {
-      const age = now - ripple.start;
-      const { radius, alpha, dotAlpha } = rippleVisual(reducedMotion ? Math.max(age, EXPAND_MS) : age, decayMs);
-      const px = ripple.x * dpr;
-      const py = ripple.y * dpr;
-
-      if (dotAlpha > 0.01) {
-        ctx.fillStyle = `rgba(180, 220, 255, ${dotAlpha})`;
-        ctx.beginPath();
-        ctx.arc(px, py, 3 * dpr, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      if (alpha > 0.01) {
-        ctx.strokeStyle = `rgba(160, 210, 255, ${alpha})`;
-        ctx.lineWidth = 2 * dpr;
-        ctx.beginPath();
-        ctx.arc(px, py, radius * dpr, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+      const t = reducedMotion ? 1 : (now - ripple.start) / 450;
+      const radius = (10 + t * 80) * dpr;
+      const alpha = (1 - t) * 0.5;
+      ctx.strokeStyle = `rgba(160, 210, 255, ${alpha})`;
+      ctx.lineWidth = 2 * dpr;
+      ctx.beginPath();
+      ctx.arc(ripple.x * dpr, ripple.y * dpr, radius, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 

@@ -13,9 +13,6 @@ The design goals and full specification live in [SPEC.md](./SPEC.md).
 - **Tap** for a short plucked note.
 - **Press and drag** for a sustained tone that glides as you move.
 - **Multi-touch** plays several notes at once.
-- Every tap leaves a **marker** where you played, so you can find your way back
-  to a note you liked. Markers linger for a while; adjust **Marker fade** in the
-  settings to change how long.
 - Open the gear icon for presets, scales, snap strength, and the short-axis
   assignment.
 
