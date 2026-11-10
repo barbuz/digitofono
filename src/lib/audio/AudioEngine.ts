@@ -220,7 +220,17 @@ export class AudioEngine {
     }
   }
 
-  /** Allocate a voice, stealing the oldest if the pool is at capacity. */
+  /**
+   * Allocate a voice, stealing the oldest if the pool is at capacity.
+   *
+   * The cap is enforced through pool growth: the pool never exceeds
+   * MAX_VOICES, and a voice is only ever handed out from the pool, so the
+   * number of voices sounding at once is bounded by MAX_VOICES too. This is
+   * only sound because MAX_VOICES is a constant. A *lowerable* cap would break
+   * it, because a pool that has already grown past the new cap keeps handing
+   * out its existing voices - which is exactly how a polyphony of 1 used to
+   * still sound several notes.
+   */
   allocate(): Voice | null {
     if (!this.ctx || !this.voiceBus || !this.waveDark || !this.waveBright) return null;
 

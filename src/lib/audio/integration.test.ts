@@ -117,6 +117,24 @@ describe('Player + AudioEngine integration', () => {
     expect(() => player.pointerMove(1, 100, 100)).not.toThrow();
   });
 
+  it('stays capped after the pool has already grown and its voices reused', () => {
+    const { ctx, engine, player } = makePlayer();
+
+    // Fill the pool to the cap, then release everything so every voice is
+    // reusable. This is the state that used to defeat a lowered cap: allocate()
+    // returns a reusable voice before it ever consults the cap, so a pool that
+    // had already grown kept handing out all of its voices.
+    for (let i = 0; i < MAX_VOICES; i += 1) player.pointerDown(i + 1, 200, 400);
+    for (let i = 0; i < MAX_VOICES; i += 1) player.pointerUp(i + 1);
+    ctx.currentTime += 10;
+    expect(activeCount(engine)).toBe(0);
+
+    for (let i = 0; i < MAX_VOICES + 5; i += 1) player.pointerDown(100 + i, 200, 400);
+
+    expect(activeCount(engine)).toBe(MAX_VOICES);
+    expect((engine as unknown as { pool: unknown[] }).pool.length).toBe(MAX_VOICES);
+  });
+
   it('uses the selected preset for its wave tables', () => {
     const { engine } = makePlayer();
     engine.setPreset(PRESETS.bell);
