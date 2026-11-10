@@ -14,7 +14,9 @@ export interface VoiceParams {
   cutoffHz: number;
   level: number;
   /**
-   * Frequency ratio of each harmony note to the root, in ascending order.
+   * Frequency ratio of each harmony note to the root, in ascending order. The
+   * `octaves` voicing puts its first ratio below 1 (an octave under the root),
+   * so a ratio is not necessarily greater than 1.
    * Empty when the harmonizer is off, in which case only the root is built -
    * so the two-oscillator graph is preserved for the non-harmony axes.
    */

@@ -80,19 +80,31 @@ describe('harmonyMidiValues (scale-independent voicings)', () => {
     expect(harmonyMidiValues(60, 'majorPentatonic', 'major')).toEqual([64, 67, 71]);
   });
 
-  it('stacks plain octaves with the octaves voicing', () => {
-    expect(harmonyMidiValues(60, 'chromatic', 'octaves')).toEqual([72, 84, 96]);
+  it('spreads octaves around the root with the octaves voicing', () => {
+    // One octave below the root, then one and two octaves above it.
+    expect(harmonyMidiValues(60, 'chromatic', 'octaves')).toEqual([48, 72, 84]);
     // Independent of the scale and of the root's pitch class.
-    expect(harmonyMidiValues(61, 'blues', 'octaves')).toEqual([73, 85, 97]);
+    expect(harmonyMidiValues(61, 'blues', 'octaves')).toEqual([49, 73, 85]);
+  });
+
+  it('puts the octaves voicing\'s lowest note below the root', () => {
+    expect(harmonyMidiValues(60, 'major', 'octaves')[0]).toBe(48);
   });
 
   it('is strictly ascending for every voicing', () => {
     for (const voicing of HARMONY_VOICING_IDS) {
       for (let midi = 48; midi <= 72; midi += 1) {
         const values = harmonyMidiValues(midi, 'naturalMinor', voicing);
-        expect(values[0]).toBeGreaterThan(midi);
         expect(values[1]).toBeGreaterThan(values[0]);
         expect(values[2]).toBeGreaterThan(values[1]);
+      }
+    }
+  });
+
+  it('keeps the chord above the root for the chord voicings', () => {
+    for (const voicing of ['diatonic', 'major'] as const) {
+      for (let midi = 48; midi <= 72; midi += 1) {
+        expect(harmonyMidiValues(midi, 'naturalMinor', voicing)[0]).toBeGreaterThan(midi);
       }
     }
   });

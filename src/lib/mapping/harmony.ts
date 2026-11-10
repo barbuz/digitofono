@@ -8,8 +8,8 @@ import { isInScale, type ScaleId } from './scales';
  *   consonant in every scale.
  * - `major` uses the intervals verbatim, ignoring the scale - a fixed major
  *   seventh chord on every root.
- * - `octaves` ignores the intervals and stacks octaves (root + 1, 2 and 3
- *   octaves up), the most scale-independent voicing.
+ * - `octaves` ignores the intervals and spreads octaves around the root: one
+ *   octave below, one above and two above, the most scale-independent voicing.
  */
 export type HarmonyVoicing = 'diatonic' | 'major' | 'octaves';
 
@@ -29,36 +29,44 @@ export const HARMONY_VOICING_LABELS: Record<HarmonyVoicing, string> = {
  */
 export const HARMONY_INTERVALS_SEMITONES: readonly number[] = [4, 7, 11];
 
-/** Octave stack used by the `octaves` voicing: one, two and three octaves up. */
-const OCTAVE_INTERVALS: readonly number[] = [12, 24, 36];
+/**
+ * Octave offsets used by the `octaves` voicing: one octave below the root, then
+ * one and two octaves above it. The lowest note deliberately sits under the
+ * root, so this voicing is not confined to notes above the played pitch.
+ */
+const OCTAVE_INTERVALS: readonly number[] = [-12, 12, 24];
 
 /** Number of notes the full chord adds on top of the root. */
 export const MAX_HARMONY_NOTES = HARMONY_INTERVALS_SEMITONES.length;
 
-function intervalsFor(voicing: HarmonyVoicing): readonly number[] {
-  return voicing === 'octaves' ? OCTAVE_INTERVALS : HARMONY_INTERVALS_SEMITONES;
-}
-
 /**
- * MIDI values of the harmony notes above `rootMidi`, one per interval, in
+ * MIDI values of the harmony notes for `rootMidi`, one per interval, in
  * ascending order.
  *
  * With the `diatonic` voicing each interval note is pulled to the nearest scale
  * degree, so the chord is a diatonic seventh: a major seventh in the chromatic
  * scale (already exact in-scale) and the scale's own third/fifth/seventh
- * elsewhere. The `major` and `octaves` voicings are scale-independent and use
- * their intervals verbatim. Either way the stack is forced strictly ascending so
- * a sparse scale cannot collapse two notes onto the same pitch.
+ * elsewhere. The `major` voicing uses the same intervals verbatim, ignoring the
+ * scale. Both stack above the root and are forced strictly ascending, so a
+ * sparse scale cannot collapse two notes onto the same pitch.
+ *
+ * The `octaves` voicing is different: it spreads octaves around the root (one
+ * below, one and two above), so its lowest note is intentionally under the root
+ * and the "above the root" bump does not apply.
  */
 export function harmonyMidiValues(
   rootMidi: number,
   scale: ScaleId,
   voicing: HarmonyVoicing = 'diatonic',
 ): number[] {
+  if (voicing === 'octaves') {
+    return OCTAVE_INTERVALS.map((interval) => rootMidi + interval);
+  }
+
   const values: number[] = [];
   let floor = rootMidi;
 
-  for (const interval of intervalsFor(voicing)) {
+  for (const interval of HARMONY_INTERVALS_SEMITONES) {
     let note = rootMidi + interval;
     if (voicing === 'diatonic' && !isInScale(note, scale)) {
       note = nearestInScale(note, scale);

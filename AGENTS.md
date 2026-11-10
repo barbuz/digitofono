@@ -53,12 +53,14 @@ verified on a real device.
   at a time as the axis advances to the full four-note chord (root + major third,
   fifth and seventh). The `harmonyVoicing` setting picks the intervals:
   `diatonic` (default) snaps them to the current scale so the chord stays
-  consonant everywhere; `major` and `octaves` ignore the scale for a fixed,
-  scale-independent stack. Each harmony note is its own dark/bright oscillator
-  pair on the same voice; because `OscillatorNode` is single-use, all pairs are
-  built at onset (even the silent ones) and faded in via a per-note gain, never
-  started later. When the harmony axis is not selected, `Player` passes empty
-  ratios and the voice keeps its original two oscillators.
+  consonant everywhere; `major` uses the intervals verbatim and `octaves` spreads
+  octaves around the root (one below, one and two above), both ignoring the scale.
+  In the chromatic scale `diatonic` and `major` are identical, since every pitch
+  class is in scale and the snapping never fires. Each harmony note is its own
+  dark/bright oscillator pair on the same voice; because `OscillatorNode` is
+  single-use, all pairs are built at onset (even the silent ones) and faded in
+  via a per-note gain, never started later. When the harmony axis is not selected,
+  `Player` passes empty ratios and the voice keeps its original two oscillators.
 - Adding a *new* field to `Settings` does not need a `SETTINGS_VERSION` bump: the
   store merges `{ ...DEFAULT_SETTINGS, ...stored }`, so an older blob simply picks
   up the new default. Bump the version only when an *existing* default changes and

@@ -192,4 +192,15 @@ describe('Player harmony wiring', () => {
     expect(ratios[1]).toBeCloseTo(Math.pow(2, 7 / 12), 6);
     expect(ratios[2]).toBeCloseTo(Math.pow(2, 11 / 12), 6);
   });
+
+  it('puts the octaves voicing an octave below, one and two above the root', () => {
+    const { engine, player } = makeHarmonyPlayer({ harmonyVoicing: 'octaves' });
+
+    player.pointerDown(1, 200, 400);
+
+    const ratios = engine.voices[0].lastParams!.harmonyRatios;
+    expect(ratios[0]).toBeCloseTo(0.5, 6);
+    expect(ratios[1]).toBeCloseTo(2, 6);
+    expect(ratios[2]).toBeCloseTo(4, 6);
+  });
 });

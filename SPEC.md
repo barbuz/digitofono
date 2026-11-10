@@ -351,12 +351,16 @@ seventh chord), chosen by a `harmonyVoicing` setting (`mapping/harmony.ts`):
   the chord never clashes with what is being played.
 - **`major`** — the intervals are used verbatim, ignoring the scale. A fixed major
   seventh chord on every root, so the harmony is the same regardless of scale.
-- **`octaves`** — the most scale-independent voicing: plain octaves above the root
-  (one, two and three octaves up). Not a chord at all, but a fixed, consonant stack
-  that is identical on every root and every scale.
+- **`octaves`** — the most scale-independent voicing: plain octaves spread around
+  the root (one octave below, one above and two above). Not a chord at all, but a
+  fixed, consonant stack that is identical on every root and every scale. Its
+  lowest note sits *below* the played note, so the voicing is not confined to
+  notes above the root.
 
-Whichever voicing is active, the stack is forced strictly ascending, so a sparse
-scale cannot fold two notes onto the same pitch.
+The `diatonic` and `major` voicings are forced strictly ascending and above the
+root, so a sparse scale cannot fold two notes onto the same pitch. (In the
+chromatic scale the two are identical, because every pitch class is already in
+scale and the snapping never fires; they differ only in sparser scales.)
 
 Each harmony note runs its own dark/bright oscillator pair at the root frequency
 times the note's ratio, and the whole chord transposes together when the pitch
