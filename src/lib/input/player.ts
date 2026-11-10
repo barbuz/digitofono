@@ -9,13 +9,6 @@ import type { Settings } from '../state/schema';
 /** Presses shorter than this become plucked notes on lift; longer ones sustain. */
 export const TAP_MS = 180;
 
-/**
- * Vibration length for the touch-down tick. Android hardware commonly ignores
- * or fails to actuate very short durations, so this sits above the ~10 ms
- * perceptibility floor rather than at a token length that never gets felt.
- */
-export const HAPTIC_MS = 15;
-
 export interface SurfaceGeometry {
   longLength: number;
   shortLength: number;
@@ -167,7 +160,6 @@ export class Player {
     });
 
     this.events.onRipple?.(x, y);
-    if (this.settings.haptics) navigator.vibrate?.(HAPTIC_MS);
     this.emit();
   }
 

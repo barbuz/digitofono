@@ -172,15 +172,6 @@
       />
     </label>
 
-    <label class="checkbox">
-      <input
-        type="checkbox"
-        checked={settings.haptics}
-        onchange={(e) => updateSettings({ haptics: e.currentTarget.checked })}
-      />
-      Haptics
-    </label>
-
     <button class="reset" onclick={resetSettings}>Reset to defaults</button>
 
     <footer class="build">
@@ -258,16 +249,6 @@
     border: 1px solid #2b3646;
     background: #1c2430;
     color: inherit;
-  }
-
-  .checkbox {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .checkbox input {
-    width: auto;
   }
 
   .reset {

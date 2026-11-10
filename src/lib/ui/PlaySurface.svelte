@@ -147,6 +147,14 @@
     reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     measure();
 
+    // Chrome Android fires its long-press haptic from the gesture recognizer,
+    // not from the contextmenu event: preventing contextmenu alone still leaves
+    // the buzz. Calling preventDefault on touchstart cancels the recognizer
+    // before it arms, which is what actually stops it. Pointer events are used
+    // for playing, so suppressing the touch default costs nothing here.
+    const suppressLongPress = (event: TouchEvent) => event.preventDefault();
+    canvas.addEventListener('touchstart', suppressLongPress, { passive: false });
+
     player = new Player(settings, geometry, {
       onTouchChange: (list) => {
         touches = list;
@@ -162,6 +170,7 @@
 
     return () => {
       window.removeEventListener('resize', onResize);
+      canvas.removeEventListener('touchstart', suppressLongPress);
       cancelAnimationFrame(rafId);
     };
   });
@@ -209,8 +218,6 @@
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
-    /* Cancels the long-press gesture so Android does not fire its own haptic
-       tick or open a callout while a finger is held on a note. */
     -webkit-touch-callout: none;
   }
 

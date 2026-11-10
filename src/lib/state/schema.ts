@@ -34,7 +34,6 @@ export interface Settings {
   scaleLines: number;
   polyphony: number;
   preset: PresetId;
-  haptics: boolean;
 }
 
 export const SETTINGS_VERSION = 1;
@@ -51,5 +50,4 @@ export const DEFAULT_SETTINGS: Settings = {
   scaleLines: 0,
   polyphony: 8,
   preset: 'warm',
-  haptics: true,
 };

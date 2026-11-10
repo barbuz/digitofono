@@ -25,7 +25,6 @@ const settings: Settings = {
   scaleLines: 0,
   polyphony: 8,
   preset: 'warm',
-  haptics: false,
 };
 
 function makePlayer() {

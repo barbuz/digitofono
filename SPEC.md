@@ -390,11 +390,13 @@ public/
   indistinguishable.
 - **Wake lock:** request `screen` wake lock after first gesture; re-acquire on
   `visibilitychange`. (Requires HTTPS — Pages provides it.)
-- **Haptics:** `navigator.vibrate(~15ms)` on touch-down (Android). Durations much
-  below ~10 ms are frequently not actuated by Android hardware, so the tick is
-  kept at a length that is actually felt. The long-press gesture is suppressed
-  (`contextmenu` prevented, `-webkit-touch-callout: none`) so the OS does not add
-  its own buzz or callout while a note is held.
+- **Haptics:** none. An app-level tick was removed: a vibration short enough to
+  feel like a touch response is not reliably actuated, and longer values read as
+  a buzz rather than feedback. Chrome Android's own long-press haptic is
+  suppressed instead by calling `preventDefault()` on `touchstart`; preventing
+  the `contextmenu` event alone does **not** stop it, because the haptic is
+  fired by the gesture recognizer, not the menu event. `-webkit-touch-callout:
+  none` and `user-select: none` cover the callout and text-selection paths.
 - **Deploy workflow:** GitHub Actions → build → `actions/upload-pages-artifact` →
   `actions/deploy-pages`. Trigger on push to `main`.
 - Repo will include a `CNAME`-free setup (default `github.io` URL) unless a custom
@@ -421,7 +423,6 @@ interface Settings {
   reverbAmount: number;    // 0..1, default 0.12
   polyphony: number;       // default 8
   preset: PresetId;        // default 'warm'
-  haptics: boolean;        // default true
   reducedMotionOverride?: boolean;
 }
 
@@ -441,7 +442,7 @@ Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 
 Settings panel: scale, base note, octave span, snap strength slider (with a clear
 "0 = free glide" marker), short-axis selector, preset selector, master volume,
-reverb, scale-line opacity, polyphony, haptics toggle.
+reverb, scale-line opacity, polyphony.
 
 ---
 
@@ -512,7 +513,7 @@ crossfade); assignable short axis (timbre / morph / volume); presets
 **Phase 4 — Practice features.** Recording/looping
 (`MediaStreamDestination` + `MediaRecorder`), wake lock, persisted settings.
 
-**Phase 5 — Polish.** Ripple/glow visuals finalization, haptics, reduced-motion,
+**Phase 5 — Polish.** Ripple/glow visuals finalization, reduced-motion,
 accessibility, touch calibration.
 
 ---
