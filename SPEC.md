@@ -384,7 +384,11 @@ public/
 - **Offline:** service worker precaches app shell; instrument works with no network.
 - **Wake lock:** request `screen` wake lock after first gesture; re-acquire on
   `visibilitychange`. (Requires HTTPS — Pages provides it.)
-- **Haptics:** `navigator.vibrate(~8ms)` on tap (Android).
+- **Haptics:** `navigator.vibrate(~15ms)` on touch-down (Android). Durations much
+  below ~10 ms are frequently not actuated by Android hardware, so the tick is
+  kept at a length that is actually felt. The long-press gesture is suppressed
+  (`contextmenu` prevented, `-webkit-touch-callout: none`) so the OS does not add
+  its own buzz or callout while a note is held.
 - **Deploy workflow:** GitHub Actions → build → `actions/upload-pages-artifact` →
   `actions/deploy-pages`. Trigger on push to `main`.
 - Repo will include a `CNAME`-free setup (default `github.io` URL) unless a custom

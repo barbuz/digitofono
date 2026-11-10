@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { Player, TAP_MS, type SurfaceGeometry } from './player';
+import { describe, expect, it, vi } from 'vitest';
+import { Player, TAP_MS, HAPTIC_MS, type SurfaceGeometry } from './player';
 import type { AudioEngine } from '../audio/AudioEngine';
 import type { Settings } from '../state/schema';
 
@@ -90,6 +90,17 @@ function makePlayer() {
   return { engine, player };
 }
 
+function makeHapticPlayer() {
+  const engine = new RecordingEngine();
+  const player = new Player(
+    { ...settings, haptics: true },
+    geometry,
+    {},
+    engine as unknown as AudioEngine,
+  );
+  return { engine, player };
+}
+
 describe('Player touch routing', () => {
   it('starts a voice and registers a touch on every press', () => {
     const { engine, player } = makePlayer();
@@ -139,5 +150,62 @@ describe('Player touch routing', () => {
       player.pointerMove(99, 100, 100);
       player.pointerUp(99);
     }).not.toThrow();
+  });
+});
+
+describe('Player haptics', () => {
+  it('fires one tick of a perceptible length on touch-down', () => {
+    const vibrate = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('navigator', { vibrate });
+    try {
+      const { player } = makeHapticPlayer();
+      player.pointerDown(1, 200, 400);
+
+      expect(vibrate).toHaveBeenCalledTimes(1);
+      expect(vibrate).toHaveBeenCalledWith(HAPTIC_MS);
+      // Guards the original bug: too short to actuate on real Android hardware.
+      expect(HAPTIC_MS).toBeGreaterThanOrEqual(10);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not vibrate when the setting is off', () => {
+    const vibrate = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('navigator', { vibrate });
+    try {
+      const { player } = makePlayer();
+      player.pointerDown(1, 200, 400);
+
+      expect(vibrate).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('ticks once per press, not on move or release', () => {
+    const vibrate = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('navigator', { vibrate });
+    try {
+      const { player } = makeHapticPlayer();
+      player.pointerDown(1, 200, 400);
+      player.pointerMove(1, 220, 420);
+      player.pointerMove(1, 240, 440);
+      player.pointerUp(1);
+
+      expect(vibrate).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('survives a browser with no vibration support', () => {
+    vi.stubGlobal('navigator', {});
+    try {
+      const { player } = makeHapticPlayer();
+      expect(() => player.pointerDown(1, 200, 400)).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

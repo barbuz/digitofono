@@ -183,6 +183,7 @@
     onpointermove={onPointerMove}
     onpointerup={onPointerUp}
     onpointercancel={onPointerUp}
+    oncontextmenu={(e) => e.preventDefault()}
     aria-label="Digitofono playing surface. Tap or drag to play."
   ></canvas>
 
@@ -208,6 +209,9 @@
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
+    /* Cancels the long-press gesture so Android does not fire its own haptic
+       tick or open a callout while a finger is held on a note. */
+    -webkit-touch-callout: none;
   }
 
   .notes {
