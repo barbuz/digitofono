@@ -5,21 +5,25 @@ import { PRESETS } from './presets';
 
 const preset = PRESETS.warm;
 
-function makeVoice() {
-  const ctx = new FakeAudioContext();
-  const out = new FakeGain();
-  const voice = new Voice(ctx as unknown as AudioContext, out as unknown as AudioNode, 0);
-  const wave = {} as PeriodicWave;
-  const params = {
+function baseParams() {
+  return {
     preset,
-    waveDark: wave,
-    waveBright: wave,
+    waveDark: {} as PeriodicWave,
+    waveBright: {} as PeriodicWave,
     frequency: 220,
     morph: 0.5,
     cutoffHz: 2000,
     level: 0.8,
+    harmonyRatios: [] as number[],
+    harmonyLevels: [] as number[],
   };
-  return { ctx, voice, params };
+}
+
+function makeVoice() {
+  const ctx = new FakeAudioContext();
+  const out = new FakeGain();
+  const voice = new Voice(ctx as unknown as AudioContext, out as unknown as AudioNode, 0);
+  return { ctx, voice, params: baseParams() };
 }
 
 function makeVibratoVoice() {
@@ -32,17 +36,7 @@ function makeVibratoVoice() {
     0,
     vibrato as unknown as AudioNode,
   );
-  const wave = {} as PeriodicWave;
-  const params = {
-    preset,
-    waveDark: wave,
-    waveBright: wave,
-    frequency: 220,
-    morph: 0.5,
-    cutoffHz: 2000,
-    level: 0.8,
-  };
-  return { ctx, voice, params, vibrato };
+  return { ctx, voice, params: baseParams(), vibrato };
 }
 
 describe('Voice lifecycle', () => {
@@ -94,9 +88,63 @@ describe('Voice lifecycle', () => {
     expect(() => {
       voice.glideFrequency(440);
       voice.setMorph(0.2);
+      voice.setHarmony([1.5, 2], [0.5, 0.5]);
       voice.setCutoff(1200);
       voice.setLevel(0.5);
     }).not.toThrow();
+  });
+});
+
+describe('Voice harmony', () => {
+  it('builds a dark/bright pair per harmony note, plus the root', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0.5, 0.25] });
+
+    // Two oscillators per note (dark + bright): root + two harmony notes.
+    expect(ctx.oscillators).toHaveLength(6);
+  });
+
+  it('tunes each note to the root frequency times its ratio', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0.5, 0.5] });
+
+    const frequencies = ctx.oscillators.map((o) => o.frequency.value);
+    // Root pair at 220, then 330 and 440 for each note's two oscillators.
+    expect(frequencies).toEqual([220, 220, 330, 330, 440, 440]);
+  });
+
+  it('starts and stops every oscillator exactly once', () => {
+    const { voice, params } = makeVoice();
+    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0.5, 0.5] });
+    expect(() => voice.release(false)).not.toThrow();
+  });
+
+  it('keeps the chord ratios while gliding, so it transposes as a chord', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0.5, 0.5] });
+
+    voice.glideFrequency(440);
+    // 440 * 1.5 = 660, 440 * 2 = 880; the root pair follows the root.
+    expect(ctx.oscillators.map((o) => o.frequency.value)).toEqual([440, 440, 660, 660, 880, 880]);
+  });
+
+  it('retunes harmony notes when the diatonic ratios change mid-glide', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0.5, 0.5] });
+
+    voice.glideFrequency(220);
+    voice.setHarmony([1.25, 1.5], [0.8, 0.4]);
+    // 220 * 1.25 = 275, 220 * 1.5 = 330.
+    expect(ctx.oscillators.map((o) => o.frequency.value)).toEqual([220, 220, 275, 275, 330, 330]);
+  });
+
+  it('builds harmony notes at zero level when the chord is not engaged', () => {
+    const { ctx, voice, params } = makeVoice();
+    // Ratios present but levels 0: the notes exist (so they can fade in) yet
+    // are silent, which is what the short axis at 0 must sound like.
+    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0, 0] });
+    expect(ctx.oscillators).toHaveLength(6);
+    expect(() => voice.setHarmony([1.5, 2], [1, 1])).not.toThrow();
   });
 });
 

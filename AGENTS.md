@@ -48,6 +48,15 @@ verified on a real device.
   defaults to existing devices, bump `SETTINGS_VERSION` (the storage key derives
   from it, so a bump starts a clean key). `settings.test.ts` pins this and fails
   if the version is not bumped.
+- The harmonizer (`mapping/harmony.ts`) is a *short-axis option*, not a separate
+  mode: at `shortPos = 0` it sounds the bare note, and harmony notes fade in one
+  at a time as the axis advances to the full triad. Intervals are a major third
+  and fifth snapped to the current scale, so the chord stays diatonic. Each
+  harmony note is its own dark/bright oscillator pair on the same voice; because
+  `OscillatorNode` is single-use, all pairs are built at onset (even the silent
+  ones) and faded in via a per-note gain, never started later. When the harmony
+  axis is not selected, `Player` passes empty ratios and the voice keeps its
+  original two oscillators.
 - Polyphony is a fixed `MAX_VOICES` (10), not a setting. A phone registers fewer
   simultaneous touches than any sensible cap, so it bounds CPU rather than
   expressing a musical choice. Don't reintroduce a slider for it.

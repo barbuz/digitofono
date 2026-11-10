@@ -112,13 +112,17 @@ export class FakeAudioContext {
   sampleRate = 48000;
   state: 'running' | 'suspended' = 'running';
   destination = new FakeGain();
+  /** Every oscillator this context has created, so tests can count voices. */
+  readonly oscillators: FakeOscillator[] = [];
 
   createGain(): FakeGain {
     return new FakeGain();
   }
 
   createOscillator(): FakeOscillator {
-    return new FakeOscillator();
+    const osc = new FakeOscillator();
+    this.oscillators.push(osc);
+    return osc;
   }
 
   createBiquadFilter(): FakeFilter {

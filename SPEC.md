@@ -37,7 +37,7 @@ iOS parity (Android + desktop browsers first; iOS is a stretch target).
 |---|----------|--------|
 | 1 | Interaction model | **Both**: quick tap = plucked note; press-and-hold = sustained gliding tone |
 | 2 | Pitch quantization | **Soft snap to scale**, strength adjustable 0.0–1.0 (0 = fully free glide) |
-| 3 | Short axis | **User-selectable** between *Timbre (brightness)*, *Harmonic morph*, *Volume* |
+| 3 | Short axis | **User-selectable** between *Timbre (brightness)*, *Harmonic morph*, *Harmony (chord)*, *Volume* |
 | 4 | Primary target | **Android Chrome** first; desktop browsers for development |
 | 5 | Visuals | Near-blank + **ripple/glow at each touch point** and a pitch indicator |
 | 6 | Rotation | **Locked at load** — no runtime orientation handling; **portrait** |
@@ -56,8 +56,8 @@ The screen is treated as a 2D control surface:
 
 - **Long axis → pitch.** Logarithmic mapping (see §5). In the default portrait
   orientation the long axis is vertical.
-- **Short axis → one assignable parameter** (Timbre / Harmonic morph / Volume,
-  §7). Left/right (horizontal) in portrait.
+- **Short axis → one assignable parameter** (Timbre / Harmonic morph / Harmony /
+  Volume, §7). Left/right (horizontal) in portrait.
 
 ### 3.2 Gestures
 
@@ -302,7 +302,7 @@ Concrete rules that keep it far from "sharp beeps":
 
 ## 7. Short-axis parameter
 
-A single setting `shortAxis` selects one of three mappings. Exactly one is active at
+A single setting `shortAxis` selects one of four mappings. Exactly one is active at
 a time; the others take fixed values from the preset.
 
 ### 7.1 Timbre (brightness) — *default*
@@ -333,7 +333,32 @@ Default tables:
 
 Additional tables can be added as presets; the crossfade mechanism is generic.
 
-### 7.3 Volume
+### 7.3 Harmony (chord)
+
+Stacks harmony notes above the played note to build a chord. Unlike the other
+axes this one changes *how many notes* sound, not the timbre of one:
+
+- At `shortPos = 0` the voice is the bare note.
+- The harmony notes fade in one at a time across the axis, so the middle of the
+  travel is a two-note interval and the far end is the full triad.
+
+Intervals are a major third and a perfect fifth, each **snapped to the nearest
+degree of the current scale** (`mapping/harmony.ts`). In the chromatic scale this
+is a plain major triad; in a minor or modal scale the third and fifth take the
+scale's own notes, so the chord never clashes with what is being played. Notes are
+forced strictly ascending, so a sparse scale (e.g. pentatonic) cannot fold two
+notes onto the same pitch.
+
+Each harmony note runs its own dark/bright oscillator pair at the root frequency
+times the note's ratio, and the whole chord transposes together when the pitch
+glides. Because `OscillatorNode` is single-use, all pairs are built at note onset
+(even the silent ones) so they can fade in later without an oscillator start.
+
+```
+noteLevels[i] = clamp01((shortPos - i/N) / (1/N))   // N = number of harmony notes
+```
+
+### 7.4 Volume
 
 Perceptual (roughly equal-loudness) curve rather than raw amplitude:
 
@@ -345,12 +370,13 @@ gain = (shortPos^2)          // simple perceptual approximation, 0..1
 Note: there is no natural "neutral" position for volume; whichever end the finger
 rests at is the level. Documented behaviour.
 
-### 7.4 Non-selected parameters
+### 7.5 Non-selected parameters
 
 When a parameter is not the short axis, it is set by the preset:
 
 - If short axis ≠ Timbre → filter cutoff fixed at preset value (e.g. 2.5 kHz).
 - If short axis ≠ Harmonic morph → fixed crossfade (e.g. 0.35 toward bright).
+- If short axis ≠ Harmony → no harmony notes; a plain single note.
 - If short axis ≠ Volume → fixed master voice gain (e.g. −10 dB).
 
 ---
@@ -401,6 +427,7 @@ src/
       pitch.ts            // log pitch + soft snap (pure, unit-tested)
       scales.ts           // scale definitions
       shortAxis.ts        // timbre / morph / volume mapping (pure)
+      harmony.ts          // chord intervals + fade-in (pure)
     state/
       settings.ts         // Svelte stores + localStorage persistence
       schema.ts           // Settings/Preset TypeScript types
@@ -510,6 +537,8 @@ Pure-function coverage is where real bugs hide:
 - `scales.ts`: each scale's pitch-class sets are correct.
 - `shortAxis.ts`: exponential timbre mapping monotonic; morph gains sum to 1;
   volume curve monotonic.
+- `harmony.ts`: intervals snapped into every scale, stack strictly ascending;
+  fade-in silent at 0 and full at 1, monotonic per note.
 - Settings serialization round-trip; version migration no-op for v1.
 
 ### 12.2 Manual device checklist (Phase 0+)
@@ -534,7 +563,7 @@ Pure-function coverage is where real bugs hide:
 |------|--------|-----------|
 | Android Chrome audio latency too high | Kills playability | Measure in Phase 0; tune `latencyHint`, keep graph shallow; fallback: AudioWorklet DSP or Capacitor shell |
 | Clicks/pops | Feels amateur | Enforce ramps; never set gain/freq instantly; envelope min attack |
-| CPU limits (morph oscillators × polyphony) | Dropouts | Cap polyphony; 2 oscillators/voice max; drop detune doubling when morph active |
+| CPU limits (morph/harmony oscillators × polyphony) | Dropouts | Cap polyphony; 2 oscillators per note, ≤ 3 notes/voice when harmony is on; harmony notes only built while the harmony axis is selected |
 | GitHub Pages base-path SW scope | PWA silently broken | Explicit `base`; verify SW scope in deployed build early |
 | Pitch precision vs expressiveness | Hard to play melodies | Soft-snap with adjustable strength (core feature) |
 | Locked orientation cropping on rotation | Minor UX | Documented; manifest locks portrait |
@@ -558,7 +587,7 @@ span; note-name display; tap-vs-hold classification; multi-touch polyphony; voic
 stealing.
 
 **Phase 3 — Timbre & short axis.** Harmonic-morph engine (dual PeriodicWave
-crossfade); assignable short axis (timbre / morph / volume); presets
+crossfade); assignable short axis (timbre / morph / harmony / volume); presets
 (`hollow`, `bell`, `pad`, `pluck`).
 
 **Phase 4 — Practice features.** Recording/looping

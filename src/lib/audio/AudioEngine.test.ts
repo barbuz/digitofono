@@ -69,6 +69,8 @@ describe('AudioEngine voice pool', () => {
       morph: 0.5,
       cutoffHz: 4000,
       level: 0.8,
+      harmonyRatios: [],
+      harmonyLevels: [],
     });
     return voice;
   }

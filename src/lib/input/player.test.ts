@@ -20,6 +20,7 @@ class RecordingVoice {
 
   glideFrequency(): void {}
   setMorph(): void {}
+  setHarmony(): void {}
   setCutoff(): void {}
   setLevel(): void {}
 

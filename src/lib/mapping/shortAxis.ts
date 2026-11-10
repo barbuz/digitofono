@@ -1,12 +1,13 @@
 import { clamp01 } from './pitch';
 
-export type ShortAxisId = 'timbre' | 'harmonicMorph' | 'volume';
+export type ShortAxisId = 'timbre' | 'harmonicMorph' | 'harmony' | 'volume';
 
-export const SHORT_AXIS_IDS: ShortAxisId[] = ['timbre', 'harmonicMorph', 'volume'];
+export const SHORT_AXIS_IDS: ShortAxisId[] = ['timbre', 'harmonicMorph', 'harmony', 'volume'];
 
 export const SHORT_AXIS_LABELS: Record<ShortAxisId, string> = {
   timbre: 'Timbre (brightness)',
   harmonicMorph: 'Harmonic morph',
+  harmony: 'Harmony (chord)',
   volume: 'Volume',
 };
 

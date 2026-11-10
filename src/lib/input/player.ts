@@ -3,6 +3,7 @@ import { Voice } from '../audio/Voice';
 import { resolveAxes } from '../audio/params';
 import { PRESETS } from '../audio/presets';
 import { positionToSnappedMidi, midiToFrequency, midiToNoteName } from '../mapping/pitch';
+import { harmonyMidiValues } from '../mapping/harmony';
 import { trackCutoffForPitch } from '../mapping/shortAxis';
 import type { Settings } from '../state/schema';
 
@@ -98,24 +99,35 @@ export class Player {
     return { pitchPos, shortPos };
   }
 
-  private frequencyFor(pitchPos: number): number {
-    const midi = positionToSnappedMidi(
+  private midiFor(pitchPos: number): number {
+    return positionToSnappedMidi(
       pitchPos,
       { baseMidi: this.settings.baseMidi, octaveSpan: this.settings.octaveSpan },
       this.settings.scale,
       this.settings.snapStrength,
     );
-    return midiToFrequency(midi);
+  }
+
+  private frequencyFor(pitchPos: number): number {
+    return midiToFrequency(this.midiFor(pitchPos));
   }
 
   private noteNameFor(pitchPos: number): string {
-    const midi = positionToSnappedMidi(
-      pitchPos,
-      { baseMidi: this.settings.baseMidi, octaveSpan: this.settings.octaveSpan },
-      this.settings.scale,
-      this.settings.snapStrength,
+    return midiToNoteName(this.midiFor(pitchPos));
+  }
+
+  /**
+   * Frequency ratios of the harmony notes above the root at `pitchPos`. Only
+   * built while the harmony axis is selected, so the other axes keep the plain
+   * two-oscillator voice.
+   */
+  private harmonyRatiosFor(pitchPos: number): number[] {
+    if (this.settings.shortAxis !== 'harmony') return [];
+    const rootMidi = this.midiFor(pitchPos);
+    const rootHz = midiToFrequency(rootMidi);
+    return harmonyMidiValues(rootMidi, this.settings.scale).map(
+      (midi) => midiToFrequency(midi) / rootHz,
     );
-    return midiToNoteName(midi);
   }
 
   pointerDown(pointerId: number, x: number, y: number): void {
@@ -148,6 +160,8 @@ export class Player {
       morph: axes.morph,
       cutoffHz: trackCutoffForPitch(axes.cutoffHz, frequency),
       level: axes.level,
+      harmonyRatios: this.harmonyRatiosFor(pitchPos),
+      harmonyLevels: axes.harmony,
     });
 
     this.touches.set(pointerId, {
@@ -175,6 +189,7 @@ export class Player {
 
     state.voice.glideFrequency(frequency);
     state.voice.setMorph(axes.morph);
+    state.voice.setHarmony(this.harmonyRatiosFor(pitchPos), axes.harmony);
     state.voice.setCutoff(trackCutoffForPitch(axes.cutoffHz, frequency));
     state.voice.setLevel(axes.level);
 
