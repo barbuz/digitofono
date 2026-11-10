@@ -30,6 +30,13 @@ export interface Settings {
   shortAxis: ShortAxisId;
   volume: number;
   reverbAmount: number;
+  /**
+   * Strength of the detuned-unison chorus, 0..1. Blurs the pitch so small
+   * tuning errors are heard as a shimmer rather than a wrong note.
+   */
+  ensemble: number;
+  /** Depth of the global pitch vibrato, 0..1. */
+  vibrato: number;
   /** Opacity (0..1) of the guide lines drawn at each scale step; 0 hides them. */
   scaleLines: number;
   polyphony: number;
@@ -47,6 +54,8 @@ export const DEFAULT_SETTINGS: Settings = {
   shortAxis: 'timbre',
   volume: 0.8,
   reverbAmount: 0.12,
+  ensemble: 0.3,
+  vibrato: 0.2,
   scaleLines: 0,
   polyphony: 8,
   preset: 'warm',

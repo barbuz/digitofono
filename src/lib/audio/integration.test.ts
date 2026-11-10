@@ -22,6 +22,8 @@ const settings: Settings = {
   shortAxis: 'timbre',
   volume: 0.8,
   reverbAmount: 0.12,
+  ensemble: 0.3,
+  vibrato: 0.2,
   scaleLines: 0,
   polyphony: 8,
   preset: 'warm',

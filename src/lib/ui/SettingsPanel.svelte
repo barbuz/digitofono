@@ -19,7 +19,7 @@
     })),
   ).flat();
 
-  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'scaleLines' | 'polyphony') {
+  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'ensemble' | 'vibrato' | 'scaleLines' | 'polyphony') {
     return (event: Event) => {
       const value = Number((event.currentTarget as HTMLInputElement).value);
       updateSettings({ [field]: value });
@@ -144,6 +144,32 @@
         step="0.02"
         value={settings.reverbAmount}
         oninput={handleNumber('reverbAmount')}
+      />
+    </label>
+
+    <label>
+      Ensemble: {Math.round(settings.ensemble * 100)}%
+      <span class="hint">detuned chorus; blurs the pitch</span>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        value={settings.ensemble}
+        oninput={handleNumber('ensemble')}
+      />
+    </label>
+
+    <label>
+      Vibrato: {Math.round(settings.vibrato * 100)}%
+      <span class="hint">pitch movement; softens tuning errors</span>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        value={settings.vibrato}
+        oninput={handleNumber('vibrato')}
       />
     </label>
 

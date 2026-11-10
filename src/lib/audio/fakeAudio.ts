@@ -31,11 +31,18 @@ export class FakeParam {
 }
 
 export class FakeNode {
+  /** What this node has been connected to, so tests can assert routing. */
+  readonly connections: unknown[] = [];
+  readonly disconnections: unknown[] = [];
+
   connect<T>(dest: T): T {
+    this.connections.push(dest);
     return dest;
   }
 
-  disconnect(): void {}
+  disconnect(dest?: unknown): void {
+    this.disconnections.push(dest);
+  }
 }
 
 export class FakeOscillator extends FakeNode {
@@ -84,6 +91,10 @@ export class FakeConvolver extends FakeNode {
   buffer: unknown = null;
 }
 
+export class FakeDelay extends FakeNode {
+  delayTime = new FakeParam();
+}
+
 class FakeBuffer {
   private readonly channels: Float32Array[];
 
@@ -124,6 +135,10 @@ export class FakeAudioContext {
 
   createConvolver(): FakeConvolver {
     return new FakeConvolver();
+  }
+
+  createDelay(_maxDelayTime?: number): FakeDelay {
+    return new FakeDelay();
   }
 
   createBuffer(channels: number, length: number): FakeBuffer {

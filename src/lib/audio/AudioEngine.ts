@@ -4,6 +4,25 @@ import { PRESETS } from './presets';
 import type { Preset } from '../state/schema';
 
 /**
+ * Global pitch vibrato. `detune` is in cents and independent of frequency, so
+ * one LFO can drive every voice's oscillators through a single shared node.
+ * A pitch that is always moving has no fixed reference to sound wrong against,
+ * which is what makes small tuning errors less noticeable.
+ */
+export const VIBRATO_HZ = 5.2;
+export const VIBRATO_MAX_CENTS = 22;
+
+/**
+ * Ensemble chorus: a short modulated delay summed with the dry signal. The
+ * delay modulation detunes the copy slightly, so the note beats against itself
+ * the way a detuned unison does, smearing the pitch without changing it.
+ */
+export const CHORUS_HZ = 0.7;
+export const CHORUS_MAX_WET = 0.7;
+const CHORUS_BASE_DELAY = 0.018;
+const CHORUS_DEPTH = 0.0035;
+
+/**
  * Owns the AudioContext, the master bus (compressor, limiter, reverb send) and
  * the voice pool. Nothing here touches Svelte; the UI drives it through plain
  * method calls.
@@ -17,12 +36,22 @@ export class AudioEngine {
   private limiter: DynamicsCompressorNode | null = null;
   private reverbSend: GainNode | null = null;
   private reverbReturn: GainNode | null = null;
+  private chorusWet: GainNode | null = null;
+  private vibratoDepth: GainNode | null = null;
 
   private pool: Voice[] = [];
   private maxVoices = 8;
   private preset: Preset = PRESETS.warm;
   private waveDark: PeriodicWave | null = null;
   private waveBright: PeriodicWave | null = null;
+
+  // Settings arrive from the Player constructor, before the context exists.
+  // Storing them lets `init` apply the real values instead of the hardcoded
+  // bus defaults, which otherwise persisted until a control was touched.
+  private desiredVolume = 1;
+  private desiredReverb = 0.12;
+  private desiredEnsemble = 0;
+  private desiredVibrato = 0;
 
   constructor(createContext: () => AudioContext = defaultContext) {
     this.createContext = createContext;
@@ -77,7 +106,69 @@ export class AudioEngine {
     convolver.connect(this.reverbReturn);
     this.reverbReturn.connect(this.compressor);
 
+    this.buildChorus();
+    this.buildVibrato();
+
     this.buildWaveTables();
+
+    // Apply whatever the Player already pushed, so the first note sounds with
+    // the user's volume, reverb, ensemble and vibrato rather than defaults.
+    this.setMasterVolume(this.desiredVolume);
+    this.setReverbAmount(this.desiredReverb);
+    this.setEnsemble(this.desiredEnsemble);
+    this.setVibrato(this.desiredVibrato);
+  }
+
+  /**
+   * Ensemble chorus on the voice bus. The delayed copy is a second path into
+   * the compressor alongside the dry signal, so the wet gain doubles as the
+   * ensemble depth control.
+   */
+  private buildChorus(): void {
+    if (!this.ctx || !this.voiceBus) return;
+    const ctx = this.ctx;
+
+    const dry = ctx.createGain();
+    const delay = ctx.createDelay(0.1);
+    const wet = ctx.createGain();
+    const lfo = ctx.createOscillator();
+    const lfoDepth = ctx.createGain();
+
+    dry.gain.value = 1;
+    delay.delayTime.value = CHORUS_BASE_DELAY;
+    wet.gain.value = 0;
+
+    lfo.type = 'sine';
+    lfo.frequency.value = CHORUS_HZ;
+    lfoDepth.gain.value = CHORUS_DEPTH;
+
+    lfo.connect(lfoDepth).connect(delay.delayTime);
+    lfo.start();
+
+    this.voiceBus.connect(dry).connect(this.compressor!);
+    this.voiceBus.connect(delay).connect(wet).connect(this.compressor!);
+
+    this.chorusWet = wet;
+  }
+
+  /**
+   * One LFO, one depth gain, shared by every voice: each voice connects its
+   * oscillators' `detune` to the same node, so the whole instrument vibratos in
+   * phase without a per-voice oscillator.
+   */
+  private buildVibrato(): void {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.value = VIBRATO_HZ;
+    depth.gain.value = 0;
+    lfo.connect(depth);
+    lfo.start();
+
+    this.vibratoDepth = depth;
   }
 
   private buildWaveTables(): void {
@@ -96,6 +187,7 @@ export class AudioEngine {
   }
 
   setMasterVolume(value: number): void {
+    this.desiredVolume = value;
     if (this.masterGain && this.ctx) {
       const clamped = Math.max(0, Math.min(1, value));
       this.masterGain.gain.setTargetAtTime(clamped, this.ctx.currentTime, 0.02);
@@ -103,9 +195,26 @@ export class AudioEngine {
   }
 
   setReverbAmount(value: number): void {
+    this.desiredReverb = value;
     if (this.reverbReturn && this.ctx) {
       const clamped = Math.max(0, Math.min(1, value));
       this.reverbReturn.gain.setTargetAtTime(clamped, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setEnsemble(value: number): void {
+    this.desiredEnsemble = value;
+    if (this.chorusWet && this.ctx) {
+      const clamped = Math.max(0, Math.min(1, value));
+      this.chorusWet.gain.setTargetAtTime(clamped * CHORUS_MAX_WET, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setVibrato(value: number): void {
+    this.desiredVibrato = value;
+    if (this.vibratoDepth && this.ctx) {
+      const clamped = Math.max(0, Math.min(1, value));
+      this.vibratoDepth.gain.setTargetAtTime(clamped * VIBRATO_MAX_CENTS, this.ctx.currentTime, 0.05);
     }
   }
 
@@ -117,7 +226,7 @@ export class AudioEngine {
     if (free) return free;
 
     if (this.pool.length < this.maxVoices) {
-      const voice = new Voice(this.ctx, this.voiceBus, this.pool.length);
+      const voice = new Voice(this.ctx, this.voiceBus, this.pool.length, this.vibratoDepth);
       this.pool.push(voice);
       return voice;
     }

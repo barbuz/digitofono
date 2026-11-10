@@ -209,6 +209,27 @@ allocated inside the render loop.
 - **reverb**: `ConvolverNode` with a **procedurally generated** impulse response
   (exponentially decaying noise, ~1.4 s, stereo) — no asset download. Small wet
   (~12%), fed via a send so it never muddies the dry signal.
+- **ensemble**: `DelayNode` (~18 ms) whose delay time is modulated by a 0.7 Hz
+  LFO, summed with the dry signal at the master compressor. Modulating the delay
+  detunes the copy slightly, so each note beats against itself the way a detuned
+  unison does — the pitch smears into a shimmer instead of sitting at one exact
+  frequency. The wet gain is the ensemble depth control (0 = bypass).
+- **vibrato**: a single 5.2 Hz LFO into a depth gain, shared by every voice. Each
+  voice connects that node to both oscillators' `detune` (cents, so it is
+  frequency-independent), giving the whole instrument an in-phase pitch movement
+  without a per-voice LFO. Depth 0 = bypass. A pitch that is always moving has no
+  fixed reference to sound wrong against, so small tuning errors are far less
+  noticeable — the same reason singers use vibrato.
+
+### 6.1.1 Why the tuning-forgiveness controls exist
+
+Playing a continuous-pitch surface by touch, small errors are unavoidable, and a
+pure steady tone makes every one of them obvious: the ear locks onto an
+unambiguous reference and hears the deviation. The fix is not more harmonics —
+a richer harmonic tone gives the ear *more* pitch cues and can make mistuning
+worse. It is to make the pitch less definite, via detuned unison (ensemble) and
+movement (vibrato). Both are settings, subtle by default and fully bypassable,
+because this is a taste call best tuned by ear.
 
 ### 6.2 Making it sound *pleasing* (explicit requirement)
 
@@ -421,6 +442,8 @@ interface Settings {
   shortAxis: ShortAxis;    // default 'timbre'
   volume: number;          // master 0..1, default 0.8
   reverbAmount: number;    // 0..1, default 0.12
+  ensemble: number;        // 0..1, default 0.3 (detuned chorus)
+  vibrato: number;         // 0..1, default 0.2 (pitch movement)
   polyphony: number;       // default 8
   preset: PresetId;        // default 'warm'
   reducedMotionOverride?: boolean;
@@ -442,7 +465,7 @@ Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 
 Settings panel: scale, base note, octave span, snap strength slider (with a clear
 "0 = free glide" marker), short-axis selector, preset selector, master volume,
-reverb, scale-line opacity, polyphony.
+reverb, ensemble, vibrato, scale-line opacity, polyphony.
 
 ---
 

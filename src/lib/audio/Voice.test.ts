@@ -22,6 +22,29 @@ function makeVoice() {
   return { ctx, voice, params };
 }
 
+function makeVibratoVoice() {
+  const ctx = new FakeAudioContext();
+  const out = new FakeGain();
+  const vibrato = new FakeGain();
+  const voice = new Voice(
+    ctx as unknown as AudioContext,
+    out as unknown as AudioNode,
+    0,
+    vibrato as unknown as AudioNode,
+  );
+  const wave = {} as PeriodicWave;
+  const params = {
+    preset,
+    waveDark: wave,
+    waveBright: wave,
+    frequency: 220,
+    morph: 0.5,
+    cutoffHz: 2000,
+    level: 0.8,
+  };
+  return { ctx, voice, params, vibrato };
+}
+
 describe('Voice lifecycle', () => {
   it('can be reused for a second note after release', () => {
     const { ctx, voice, params } = makeVoice();
@@ -74,5 +97,30 @@ describe('Voice lifecycle', () => {
       voice.setCutoff(1200);
       voice.setLevel(0.5);
     }).not.toThrow();
+  });
+});
+
+describe('Voice vibrato wiring', () => {
+  it('routes the shared vibrato into both oscillators while sounding', () => {
+    const { voice, params, vibrato } = makeVibratoVoice();
+    voice.start(params);
+
+    // Two detune params - one per oscillator - must be driven by the LFO node.
+    expect(vibrato.connections).toHaveLength(2);
+    expect(vibrato.connections.every((c) => c !== null && typeof c === 'object')).toBe(true);
+  });
+
+  it('cuts the vibrato connections on release so rebuilds do not leak', () => {
+    const { ctx, voice, params, vibrato } = makeVibratoVoice();
+    voice.start(params);
+    voice.release(false);
+    ctx.currentTime += 10;
+
+    // The next start rebuilds the oscillators; the previous ones must have been
+    // unlinked from the shared LFO, or each note would strand two detune params.
+    voice.start(params);
+
+    const cuts = vibrato.disconnections.filter((d) => d !== undefined);
+    expect(cuts).toHaveLength(2);
   });
 });

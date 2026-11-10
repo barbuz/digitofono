@@ -29,6 +29,12 @@ export class Voice {
 
   private readonly ctx: AudioContext;
   private readonly out: AudioNode;
+  /**
+   * Shared vibrato source. It is a node (the LFO depth gain), not an
+   * `AudioParam`: the connection runs from it *into* each oscillator's
+   * `detune`, so modulating in cents shifts every voice together.
+   */
+  private readonly vibrato: AudioNode | null;
 
   private oscDark: OscillatorNode | null = null;
   private oscBright: OscillatorNode | null = null;
@@ -46,10 +52,11 @@ export class Voice {
   /** Timestamp after which this voice's nodes have fully stopped. */
   freeAt = 0;
 
-  constructor(ctx: AudioContext, out: AudioNode, id: number) {
+  constructor(ctx: AudioContext, out: AudioNode, id: number, vibrato: AudioNode | null = null) {
     this.ctx = ctx;
     this.out = out;
     this.id = id;
+    this.vibrato = vibrato;
   }
 
   /** A voice can be reused once its nodes have fully stopped. */
@@ -78,6 +85,10 @@ export class Voice {
     oscBright.setPeriodicWave(params.waveBright);
     oscDark.frequency.setValueAtTime(params.frequency, now);
     oscBright.frequency.setValueAtTime(params.frequency, now);
+    if (this.vibrato) {
+      this.vibrato.connect(oscDark.detune);
+      this.vibrato.connect(oscBright.detune);
+    }
 
     darkGain.gain.value = 1 - params.morph;
     brightGain.gain.value = params.morph;
@@ -173,6 +184,12 @@ export class Voice {
   }
 
   private dispose(): void {
+    // Disconnecting a node drops its outgoing connections but leaves the
+    // shared vibrato wired to its `detune` params, so those are cut explicitly
+    // or every rebuild would leave the old oscillator held by the LFO.
+    if (this.vibrato && this.oscDark) this.vibrato.disconnect(this.oscDark.detune);
+    if (this.vibrato && this.oscBright) this.vibrato.disconnect(this.oscBright.detune);
+
     this.oscDark?.disconnect();
     this.oscBright?.disconnect();
     this.darkGain?.disconnect();

@@ -85,6 +85,8 @@ export class Player {
     this.engine.setPolyphony(settings.polyphony);
     this.engine.setMasterVolume(settings.volume);
     this.engine.setReverbAmount(settings.reverbAmount);
+    this.engine.setEnsemble(settings.ensemble);
+    this.engine.setVibrato(settings.vibrato);
   }
 
   /** Convert a screen point to normalized long/short axis positions. */
