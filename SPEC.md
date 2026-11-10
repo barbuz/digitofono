@@ -382,6 +382,12 @@ public/
 - **Fullscreen:** standalone display mode; `viewport-fit=cover`; hide scrollbars;
   prevent pull-to-refresh (`overscroll-behavior: none`).
 - **Offline:** service worker precaches app shell; instrument works with no network.
+- **Update visibility:** the build's version and short commit are stamped into the
+  bundle at compile time and shown in the settings panel, with a "Force update"
+  control that clears caches and service workers. An installed PWA can keep
+  serving a stale cached bundle with no on-screen sign, so without a build stamp
+  "has not updated yet" and "updated but nothing looks different" are
+  indistinguishable.
 - **Wake lock:** request `screen` wake lock after first gesture; re-acquire on
   `visibilitychange`. (Requires HTTPS — Pages provides it.)
 - **Haptics:** `navigator.vibrate(~15ms)` on touch-down (Android). Durations much

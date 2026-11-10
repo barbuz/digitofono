@@ -4,6 +4,7 @@
   import { SHORT_AXIS_IDS, SHORT_AXIS_LABELS } from '../mapping/shortAxis';
   import { NOTE_NAMES } from '../mapping/pitch';
   import { updateSettings, resetSettings } from '../state/settings';
+  import { BUILD_INFO, formatBuildLabel } from '../version';
   import type { Settings } from '../state/schema';
   import type { ScaleId } from '../mapping/scales';
   import type { ShortAxisId } from '../mapping/shortAxis';
@@ -23,6 +24,20 @@
       const value = Number((event.currentTarget as HTMLInputElement).value);
       updateSettings({ [field]: value });
     };
+  }
+
+  // Escape hatch for a stale install: drop every cache and service worker, then
+  // reload so the device fetches the current build from the network.
+  async function forceUpdate(): Promise<void> {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((r) => r.unregister()));
+    }
+    if (typeof caches !== 'undefined') {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    window.location.reload();
   }
 </script>
 
@@ -167,6 +182,11 @@
     </label>
 
     <button class="reset" onclick={resetSettings}>Reset to defaults</button>
+
+    <footer class="build">
+      <span>Build {formatBuildLabel(BUILD_INFO)}</span>
+      <button class="update" onclick={forceUpdate}>Force update</button>
+    </footer>
   </aside>
 {/if}
 
@@ -257,6 +277,25 @@
     border: 1px solid #2b3646;
     background: #1c2430;
     color: inherit;
+    cursor: pointer;
+  }
+
+  .build {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: #7d8ea6;
+  }
+
+  .update {
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.4rem;
+    border: 1px solid #2b3646;
+    background: #1c2430;
+    color: inherit;
+    font-size: 0.75rem;
     cursor: pointer;
   }
 </style>
