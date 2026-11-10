@@ -43,6 +43,14 @@ verified on a real device.
   forever.
 - Keep the default scale `chromatic` and the default short axis `timbre` unless
   the spec changes.
+- Changing a value in `DEFAULT_SETTINGS` only affects fresh installs. The store
+  merges `{ ...DEFAULT_SETTINGS, ...stored }`, so a saved blob wins. To push new
+  defaults to existing devices, bump `SETTINGS_VERSION` (the storage key derives
+  from it, so a bump starts a clean key). `settings.test.ts` pins this and fails
+  if the version is not bumped.
+- Polyphony is a fixed `MAX_VOICES` (10), not a setting. A phone registers fewer
+  simultaneous touches than any sensible cap, so it bounds CPU rather than
+  expressing a musical choice. Don't reintroduce a slider for it.
 
 ## Deployment
 
