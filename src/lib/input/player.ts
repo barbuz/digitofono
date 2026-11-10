@@ -82,7 +82,6 @@ export class Player {
   private applySettings(settings: Settings): void {
     const preset = PRESETS[settings.preset];
     this.engine.setPreset(preset);
-    this.engine.setPolyphony(settings.polyphony);
     this.engine.setMasterVolume(settings.volume);
     this.engine.setReverbAmount(settings.reverbAmount);
     this.engine.setEnsemble(settings.ensemble);

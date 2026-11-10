@@ -58,7 +58,6 @@ class RecordingEngine {
   }
 
   setPreset(): void {}
-  setPolyphony(): void {}
   setMasterVolume(): void {}
   setReverbAmount(): void {}
   setEnsemble(): void {}
@@ -66,7 +65,7 @@ class RecordingEngine {
 }
 
 const settings: Settings = {
-  version: 1,
+  version: 2,
   baseMidi: 48,
   octaveSpan: 3,
   scale: 'chromatic',
@@ -77,7 +76,6 @@ const settings: Settings = {
   ensemble: 0.3,
   vibrato: 0.2,
   scaleLines: 0,
-  polyphony: 8,
   preset: 'warm',
 };
 

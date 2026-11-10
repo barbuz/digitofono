@@ -39,24 +39,22 @@ export interface Settings {
   vibrato: number;
   /** Opacity (0..1) of the guide lines drawn at each scale step; 0 hides them. */
   scaleLines: number;
-  polyphony: number;
   preset: PresetId;
 }
 
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
   version: SETTINGS_VERSION,
   baseMidi: 48,
   octaveSpan: 3,
   scale: 'chromatic',
-  snapStrength: 0.6,
+  snapStrength: 0.2,
   shortAxis: 'timbre',
   volume: 0.8,
   reverbAmount: 0.12,
-  ensemble: 0.3,
+  ensemble: 0.75,
   vibrato: 0.2,
-  scaleLines: 0,
-  polyphony: 8,
+  scaleLines: 0.5,
   preset: 'warm',
 };

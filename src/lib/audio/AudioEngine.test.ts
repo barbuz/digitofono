@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AudioEngine, CHORUS_MAX_WET, VIBRATO_MAX_CENTS } from './AudioEngine';
+import { AudioEngine, CHORUS_MAX_WET, MAX_VOICES, VIBRATO_MAX_CENTS } from './AudioEngine';
 import { FakeAudioContext, FakeGain } from './fakeAudio';
 
 function makeEngine() {
@@ -55,5 +55,46 @@ describe('AudioEngine deferred settings', () => {
 
     expect(internals(engine).chorusWet.gain.value).toBeCloseTo(CHORUS_MAX_WET);
     expect(internals(engine).vibratoDepth.gain.value).toBeCloseTo(0);
+  });
+});
+
+describe('AudioEngine voice pool', () => {
+  function startVoice(engine: AudioEngine, frequency: number) {
+    const voice = engine.allocate()!;
+    voice.start({
+      preset: engine.currentPreset,
+      waveDark: engine.currentWaveDark!,
+      waveBright: engine.currentWaveBright!,
+      frequency,
+      morph: 0.5,
+      cutoffHz: 4000,
+      level: 0.8,
+    });
+    return voice;
+  }
+
+  it('never grows the pool past the fixed voice cap', async () => {
+    const { engine } = makeEngine();
+    await engine.ensureRunning();
+
+    for (let i = 0; i < MAX_VOICES + 8; i += 1) startVoice(engine, 200 + i * 10);
+
+    const pool = (engine as unknown as { pool: unknown[] }).pool;
+    expect(pool.length).toBe(MAX_VOICES);
+  });
+
+  it('steals an existing voice instead of allocating beyond the cap', async () => {
+    const { engine } = makeEngine();
+    await engine.ensureRunning();
+
+    const voices = new Set<unknown>();
+    for (let i = 0; i < MAX_VOICES; i += 1) voices.add(startVoice(engine, 200 + i * 10));
+    expect(voices.size).toBe(MAX_VOICES);
+
+    // Every further note must reuse one of the capped set, not add to it.
+    for (let i = 0; i < 20; i += 1) {
+      expect(voices.has(startVoice(engine, 400 + i))).toBe(true);
+    }
+    expect((engine as unknown as { pool: unknown[] }).pool.length).toBe(MAX_VOICES);
   });
 });

@@ -23,6 +23,13 @@ const CHORUS_BASE_DELAY = 0.018;
 const CHORUS_DEPTH = 0.0035;
 
 /**
+ * Fixed voice-pool size. Ten is more fingers than a phone will register
+ * simultaneously, so notes are never dropped for want of a voice, while the
+ * cap still bounds CPU on dense chords. Beyond it the oldest voice is stolen.
+ */
+export const MAX_VOICES = 10;
+
+/**
  * Owns the AudioContext, the master bus (compressor, limiter, reverb send) and
  * the voice pool. Nothing here touches Svelte; the UI drives it through plain
  * method calls.
@@ -40,7 +47,6 @@ export class AudioEngine {
   private vibratoDepth: GainNode | null = null;
 
   private pool: Voice[] = [];
-  private maxVoices = 8;
   private preset: Preset = PRESETS.warm;
   private waveDark: PeriodicWave | null = null;
   private waveBright: PeriodicWave | null = null;
@@ -182,10 +188,6 @@ export class AudioEngine {
     if (this.ctx) this.buildWaveTables();
   }
 
-  setPolyphony(max: number): void {
-    this.maxVoices = Math.max(1, Math.min(16, Math.floor(max)));
-  }
-
   setMasterVolume(value: number): void {
     this.desiredVolume = value;
     if (this.masterGain && this.ctx) {
@@ -225,7 +227,7 @@ export class AudioEngine {
     const free = this.pool.find((v) => v.reusable);
     if (free) return free;
 
-    if (this.pool.length < this.maxVoices) {
+    if (this.pool.length < MAX_VOICES) {
       const voice = new Voice(this.ctx, this.voiceBus, this.pool.length, this.vibratoDepth);
       this.pool.push(voice);
       return voice;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AudioEngine } from './AudioEngine';
+import { AudioEngine, MAX_VOICES } from './AudioEngine';
 import { Player, TAP_MS } from '../input/player';
 import { FakeAudioContext } from './fakeAudio';
 import { PRESETS } from './presets';
@@ -14,7 +14,7 @@ import type { Settings } from '../state/schema';
  */
 
 const settings: Settings = {
-  version: 1,
+  version: 2,
   baseMidi: 48,
   octaveSpan: 3,
   scale: 'chromatic',
@@ -25,7 +25,6 @@ const settings: Settings = {
   ensemble: 0.3,
   vibrato: 0.2,
   scaleLines: 0,
-  polyphony: 8,
   preset: 'warm',
 };
 
@@ -97,24 +96,24 @@ describe('Player + AudioEngine integration', () => {
     const { engine, player } = makePlayer();
 
     // Press more simultaneous touches than the pool holds; stealing must keep
-    // the count at the configured limit rather than failing to allocate.
-    for (let i = 0; i < settings.polyphony + 4; i += 1) {
+    // the count at the fixed limit rather than failing to allocate.
+    for (let i = 0; i < MAX_VOICES + 4; i += 1) {
       player.pointerDown(i + 1, 200, 400);
     }
-    expect(activeCount(engine)).toBe(settings.polyphony);
+    expect(activeCount(engine)).toBe(MAX_VOICES);
   });
 
   it('drops the stolen touch so it cannot steer the replacement note', () => {
     const { player } = makePlayer();
 
-    for (let i = 0; i < settings.polyphony + 1; i += 1) {
+    for (let i = 0; i < MAX_VOICES + 1; i += 1) {
       player.pointerDown(i + 1, 200, 400);
     }
 
     // The first finger's voice was stolen; its touch must be gone, so a move
     // from it is ignored rather than gliding the newest note.
     const touches = (player as unknown as { touches: Map<number, unknown> }).touches;
-    expect(touches.size).toBe(settings.polyphony);
+    expect(touches.size).toBe(MAX_VOICES);
     expect(() => player.pointerMove(1, 100, 100)).not.toThrow();
   });
 

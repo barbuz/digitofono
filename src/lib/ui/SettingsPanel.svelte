@@ -19,7 +19,7 @@
     })),
   ).flat();
 
-  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'ensemble' | 'vibrato' | 'scaleLines' | 'polyphony') {
+  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'ensemble' | 'vibrato' | 'scaleLines') {
     return (event: Event) => {
       const value = Number((event.currentTarget as HTMLInputElement).value);
       updateSettings({ [field]: value });
@@ -183,18 +183,6 @@
         step="0.05"
         value={settings.scaleLines}
         oninput={handleNumber('scaleLines')}
-      />
-    </label>
-
-    <label>
-      Polyphony: {settings.polyphony}
-      <input
-        type="range"
-        min="1"
-        max="16"
-        step="1"
-        value={settings.polyphony}
-        oninput={handleNumber('polyphony')}
       />
     </label>
 

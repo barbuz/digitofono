@@ -284,7 +284,9 @@ Concrete rules that keep it far from "sharp beeps":
 
 ### 6.4 Polyphony & voice management
 
-- Max concurrent voices: **8** (configurable). One per pointer, capped.
+- Max concurrent voices: **10, fixed**. One per pointer, capped. Not exposed in
+  the UI: ten is more fingers than a phone registers at once, so the cap is a CPU
+  bound rather than a musical control.
 - Voice stealing: if at cap, steal the **oldest** voice (fade it out over ~30 ms,
   don't hard-cut).
 - Voice pool: pre-allocate `Voice` objects; reuse to avoid GC in hot paths.
@@ -462,13 +464,13 @@ interface Settings {
   baseMidi: number;        // default 48
   octaveSpan: number;      // default 3
   scale: Scale;            // default 'chromatic' (only scale in v1)
-  snapStrength: number;    // 0..1, default 0.6
+  snapStrength: number;    // 0..1, default 0.2
   shortAxis: ShortAxis;    // default 'timbre'
   volume: number;          // master 0..1, default 0.8
   reverbAmount: number;    // 0..1, default 0.12
-  ensemble: number;        // 0..1, default 0.3 (detuned chorus)
+  ensemble: number;        // 0..1, default 0.75 (detuned chorus)
   vibrato: number;         // 0..1, default 0.2 (pitch movement)
-  polyphony: number;       // default 8
+  scaleLines: number;      // 0..1 opacity, default 0.5
   preset: PresetId;        // default 'warm'
   reducedMotionOverride?: boolean;
 }
@@ -489,7 +491,7 @@ Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 
 Settings panel: scale, base note, octave span, snap strength slider (with a clear
 "0 = free glide" marker), short-axis selector, preset selector, master volume,
-reverb, ensemble, vibrato, scale-line opacity, polyphony.
+reverb, ensemble, vibrato, scale-line opacity.
 
 ---
 

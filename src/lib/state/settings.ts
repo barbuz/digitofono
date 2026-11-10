@@ -1,7 +1,7 @@
 import { writable, get, type Readable } from 'svelte/store';
 import { DEFAULT_SETTINGS, SETTINGS_VERSION, type Settings } from './schema';
 
-const STORAGE_KEY = 'digitofono.settings.v1';
+const STORAGE_KEY = `digitofono.settings.v${SETTINGS_VERSION}`;
 
 function load(): Settings {
   if (typeof localStorage === 'undefined') return { ...DEFAULT_SETTINGS };
