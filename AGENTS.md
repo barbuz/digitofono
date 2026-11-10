@@ -51,6 +51,12 @@ verified on a real device.
 - Polyphony is a fixed `MAX_VOICES` (10), not a setting. A phone registers fewer
   simultaneous touches than any sensible cap, so it bounds CPU rather than
   expressing a musical choice. Don't reintroduce a slider for it.
+- `AudioEngine.allocate` bounds the sounding voices through *pool growth*: the
+  pool never exceeds `MAX_VOICES`, and voices are only handed out from the pool.
+  The `find(reusable)` fast path runs before the cap check and ignores it, so a
+  cap that could be lowered at runtime would not be honoured once the pool had
+  grown - that is exactly why a polyphony of 1 still sounded several notes. Keep
+  the cap constant.
 
 ## Deployment
 
