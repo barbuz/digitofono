@@ -60,4 +60,16 @@ describe('settings persistence', () => {
     // Untouched fields still come from the defaults.
     expect(getSettings().snapStrength).toBe(0.2);
   });
+
+  it('fills in a newly added field from the defaults without a version bump', async () => {
+    // A v2 blob written before `harmonyVoicing` existed. The additive field must
+    // fall back to the default via the merge, so the version need not move.
+    installStorage({
+      'digitofono.settings.v2': JSON.stringify({ version: 2, shortAxis: 'harmony' }),
+    });
+
+    const { getSettings } = await loadStore();
+    expect(getSettings().shortAxis).toBe('harmony');
+    expect(getSettings().harmonyVoicing).toBe('diatonic');
+  });
 });

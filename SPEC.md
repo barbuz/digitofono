@@ -340,14 +340,23 @@ axes this one changes *how many notes* sound, not the timbre of one:
 
 - At `shortPos = 0` the voice is the bare note.
 - The harmony notes fade in one at a time across the axis, so the middle of the
-  travel is a two-note interval and the far end is the full triad.
+  travel is a two-note interval and the far end is the full four-note chord.
 
-Intervals are a major third and a perfect fifth, each **snapped to the nearest
-degree of the current scale** (`mapping/harmony.ts`). In the chromatic scale this
-is a plain major triad; in a minor or modal scale the third and fifth take the
-scale's own notes, so the chord never clashes with what is being played. Notes are
-forced strictly ascending, so a sparse scale (e.g. pentatonic) cannot fold two
-notes onto the same pitch.
+The intervals are a major third, a perfect fifth and a major seventh (a major
+seventh chord), chosen by a `harmonyVoicing` setting (`mapping/harmony.ts`):
+
+- **`diatonic`** *(default)* — each interval is **snapped to the nearest degree of
+  the current scale**. In the chromatic scale this is a plain major seventh chord;
+  in a minor or modal scale the third/fifth/seventh take the scale's own notes, so
+  the chord never clashes with what is being played.
+- **`major`** — the intervals are used verbatim, ignoring the scale. A fixed major
+  seventh chord on every root, so the harmony is the same regardless of scale.
+- **`octaves`** — the most scale-independent voicing: plain octaves above the root
+  (one, two and three octaves up). Not a chord at all, but a fixed, consonant stack
+  that is identical on every root and every scale.
+
+Whichever voicing is active, the stack is forced strictly ascending, so a sparse
+scale cannot fold two notes onto the same pitch.
 
 Each harmony note runs its own dark/bright oscillator pair at the root frequency
 times the note's ratio, and the whole chord transposes together when the pitch
@@ -537,8 +546,9 @@ Pure-function coverage is where real bugs hide:
 - `scales.ts`: each scale's pitch-class sets are correct.
 - `shortAxis.ts`: exponential timbre mapping monotonic; morph gains sum to 1;
   volume curve monotonic.
-- `harmony.ts`: intervals snapped into every scale, stack strictly ascending;
-  fade-in silent at 0 and full at 1, monotonic per note.
+- `harmony.ts`: diatonic intervals snapped into every scale, `major`/`octaves`
+  voicings scale-independent, stack strictly ascending for every voicing; fade-in
+  silent at 0 and full at 1, monotonic per note.
 - Settings serialization round-trip; version migration no-op for v1.
 
 ### 12.2 Manual device checklist (Phase 0+)
@@ -563,7 +573,7 @@ Pure-function coverage is where real bugs hide:
 |------|--------|-----------|
 | Android Chrome audio latency too high | Kills playability | Measure in Phase 0; tune `latencyHint`, keep graph shallow; fallback: AudioWorklet DSP or Capacitor shell |
 | Clicks/pops | Feels amateur | Enforce ramps; never set gain/freq instantly; envelope min attack |
-| CPU limits (morph/harmony oscillators × polyphony) | Dropouts | Cap polyphony; 2 oscillators per note, ≤ 3 notes/voice when harmony is on; harmony notes only built while the harmony axis is selected |
+| CPU limits (morph/harmony oscillators × polyphony) | Dropouts | Cap polyphony; 2 oscillators per note, ≤ 4 notes/voice when harmony is on; harmony notes only built while the harmony axis is selected |
 | GitHub Pages base-path SW scope | PWA silently broken | Explicit `base`; verify SW scope in deployed build early |
 | Pitch precision vs expressiveness | Hard to play melodies | Soft-snap with adjustable strength (core feature) |
 | Locked orientation cropping on rotation | Minor UX | Documented; manifest locks portrait |

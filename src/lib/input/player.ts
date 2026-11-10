@@ -125,7 +125,7 @@ export class Player {
     if (this.settings.shortAxis !== 'harmony') return [];
     const rootMidi = this.midiFor(pitchPos);
     const rootHz = midiToFrequency(rootMidi);
-    return harmonyMidiValues(rootMidi, this.settings.scale).map(
+    return harmonyMidiValues(rootMidi, this.settings.scale, this.settings.harmonyVoicing).map(
       (midi) => midiToFrequency(midi) / rootHz,
     );
   }

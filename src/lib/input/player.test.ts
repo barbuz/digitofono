@@ -13,9 +13,12 @@ import type { Settings } from '../state/schema';
 class RecordingVoice {
   started = 0;
   releases: boolean[] = [];
+  /** Params of the last `start`, so tests can assert what the Player built. */
+  lastParams: { harmonyRatios: number[]; harmonyLevels: number[] } | null = null;
 
-  start(): void {
+  start(params: { harmonyRatios: number[]; harmonyLevels: number[] }): void {
     this.started += 1;
+    this.lastParams = params;
   }
 
   glideFrequency(): void {}
@@ -72,6 +75,7 @@ const settings: Settings = {
   scale: 'chromatic',
   snapStrength: 0.6,
   shortAxis: 'timbre',
+  harmonyVoicing: 'diatonic',
   volume: 0.8,
   reverbAmount: 0.12,
   ensemble: 0.3,
@@ -141,5 +145,51 @@ describe('Player touch routing', () => {
       player.pointerMove(99, 100, 100);
       player.pointerUp(99);
     }).not.toThrow();
+  });
+});
+
+describe('Player harmony wiring', () => {
+  function makeHarmonyPlayer(patch: Partial<Settings> = {}) {
+    const engine = new RecordingEngine();
+    const harmonySettings: Settings = { ...settings, shortAxis: 'harmony', ...patch };
+    const player = new Player(harmonySettings, geometry, {}, engine as unknown as AudioEngine);
+    return { engine, player };
+  }
+
+  it('passes one ratio per harmony note when the harmony axis is active', () => {
+    const { engine, player } = makeHarmonyPlayer();
+
+    player.pointerDown(1, 200, 400);
+
+    const ratios = engine.voices[0].lastParams!.harmonyRatios;
+    // A major seventh chord: three notes above the root.
+    expect(ratios).toHaveLength(3);
+    // Ascending, all above the root.
+    expect(ratios[0]).toBeGreaterThan(1);
+    expect(ratios[1]).toBeGreaterThan(ratios[0]);
+    expect(ratios[2]).toBeGreaterThan(ratios[1]);
+  });
+
+  it('passes no ratios when another axis is selected', () => {
+    const { engine, player } = makeHarmonyPlayer({ shortAxis: 'timbre' });
+
+    player.pointerDown(1, 200, 400);
+
+    expect(engine.voices[0].lastParams!.harmonyRatios).toEqual([]);
+  });
+
+  it('uses the fixed major voicing regardless of the scale', () => {
+    const { engine, player } = makeHarmonyPlayer({
+      scale: 'naturalMinor',
+      harmonyVoicing: 'major',
+    });
+
+    player.pointerDown(1, 200, 400);
+
+    const ratios = engine.voices[0].lastParams!.harmonyRatios;
+    // Major third, fifth and seventh, as ratios of the root.
+    expect(ratios[0]).toBeCloseTo(Math.pow(2, 4 / 12), 6);
+    expect(ratios[1]).toBeCloseTo(Math.pow(2, 7 / 12), 6);
+    expect(ratios[2]).toBeCloseTo(Math.pow(2, 11 / 12), 6);
   });
 });

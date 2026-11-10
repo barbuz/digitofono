@@ -98,10 +98,10 @@ describe('Voice lifecycle', () => {
 describe('Voice harmony', () => {
   it('builds a dark/bright pair per harmony note, plus the root', () => {
     const { ctx, voice, params } = makeVoice();
-    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0.5, 0.25] });
+    voice.start({ ...params, harmonyRatios: [1.25, 1.5, 1.875], harmonyLevels: [0.5, 0.25, 0.1] });
 
-    // Two oscillators per note (dark + bright): root + two harmony notes.
-    expect(ctx.oscillators).toHaveLength(6);
+    // Two oscillators per note (dark + bright): root + three harmony notes.
+    expect(ctx.oscillators).toHaveLength(8);
   });
 
   it('tunes each note to the root frequency times its ratio', () => {
@@ -115,7 +115,7 @@ describe('Voice harmony', () => {
 
   it('starts and stops every oscillator exactly once', () => {
     const { voice, params } = makeVoice();
-    voice.start({ ...params, harmonyRatios: [1.5, 2], harmonyLevels: [0.5, 0.5] });
+    voice.start({ ...params, harmonyRatios: [1.25, 1.5, 1.875], harmonyLevels: [0.5, 0.5, 0.5] });
     expect(() => voice.release(false)).not.toThrow();
   });
 

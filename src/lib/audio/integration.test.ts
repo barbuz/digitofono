@@ -20,6 +20,7 @@ const settings: Settings = {
   scale: 'chromatic',
   snapStrength: 0.6,
   shortAxis: 'timbre',
+  harmonyVoicing: 'diatonic',
   volume: 0.8,
   reverbAmount: 0.12,
   ensemble: 0.3,
@@ -139,5 +140,49 @@ describe('Player + AudioEngine integration', () => {
     const { engine } = makePlayer();
     engine.setPreset(PRESETS.bell);
     expect(engine.currentPreset).toBe(PRESETS.bell);
+  });
+});
+
+describe('Player harmony integration', () => {
+  function makeHarmonyPlayer(scale: Settings['scale'], voicing: Settings['harmonyVoicing']) {
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine(() => ctx as unknown as AudioContext);
+    const player = new Player(
+      { ...settings, shortAxis: 'harmony', scale, harmonyVoicing: voicing },
+      { longLength: 800, shortLength: 400, longIsVertical: true },
+      {},
+      engine,
+    );
+    return { ctx, engine, player };
+  }
+
+  it('builds a root plus a three-note chord on the real voice', async () => {
+    const { ctx, engine, player } = makeHarmonyPlayer('chromatic', 'diatonic');
+
+    // Prime the engine so its own LFOs exist before the baseline is taken, then
+    // count only what the note adds: four notes (root + third + fifth +
+    // seventh), two oscillators each.
+    await engine.ensureRunning();
+    const before = ctx.oscillators.length;
+    player.pointerDown(1, 200, 400);
+
+    expect(ctx.oscillators.length - before).toBe(8);
+  });
+
+  it('keeps the plain two-oscillator voice when harmony is not the axis', async () => {
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine(() => ctx as unknown as AudioContext);
+    const player = new Player(
+      { ...settings, shortAxis: 'timbre' },
+      { longLength: 800, shortLength: 400, longIsVertical: true },
+      {},
+      engine,
+    );
+
+    await engine.ensureRunning();
+    const before = ctx.oscillators.length;
+    player.pointerDown(1, 200, 400);
+
+    expect(ctx.oscillators.length - before).toBe(2);
   });
 });

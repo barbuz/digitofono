@@ -2,12 +2,14 @@
   import { PRESETS, PRESET_IDS } from '../audio/presets';
   import { SCALE_IDS, SCALE_LABELS } from '../mapping/scales';
   import { SHORT_AXIS_IDS, SHORT_AXIS_LABELS } from '../mapping/shortAxis';
+  import { HARMONY_VOICING_IDS, HARMONY_VOICING_LABELS } from '../mapping/harmony';
   import { NOTE_NAMES } from '../mapping/pitch';
   import { updateSettings, resetSettings } from '../state/settings';
   import { BUILD_INFO, formatBuildLabel } from '../version';
   import type { Settings } from '../state/schema';
   import type { ScaleId } from '../mapping/scales';
   import type { ShortAxisId } from '../mapping/shortAxis';
+  import type { HarmonyVoicing } from '../mapping/harmony';
   import type { PresetId } from '../state/schema';
 
   let { settings, open = $bindable(false) }: { settings: Settings; open?: boolean } = $props();
@@ -73,6 +75,21 @@
         {/each}
       </select>
     </label>
+
+    {#if settings.shortAxis === 'harmony'}
+      <label>
+        Harmony voicing
+        <select
+          value={settings.harmonyVoicing}
+          onchange={(e) =>
+            updateSettings({ harmonyVoicing: (e.currentTarget.value as HarmonyVoicing) })}
+        >
+          {#each HARMONY_VOICING_IDS as id}
+            <option value={id}>{HARMONY_VOICING_LABELS[id]}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
 
     <label>
       Scale

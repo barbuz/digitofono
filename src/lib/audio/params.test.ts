@@ -31,8 +31,8 @@ describe('resolveAxes', () => {
   it('fades the harmony in when harmony is the short axis', () => {
     const settings = settingsWith({ shortAxis: 'harmony' });
     // One end is the bare note, the other the full chord.
-    expect(resolveAxes(settings, preset, 0).harmony).toEqual([0, 0]);
-    expect(resolveAxes(settings, preset, 1).harmony).toEqual([1, 1]);
+    expect(resolveAxes(settings, preset, 0).harmony).toEqual([0, 0, 0]);
+    expect(resolveAxes(settings, preset, 1).harmony).toEqual([1, 1, 1]);
   });
 
   it('leaves the harmony silent when it is not the short axis', () => {

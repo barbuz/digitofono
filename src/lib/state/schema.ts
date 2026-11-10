@@ -1,3 +1,4 @@
+import type { HarmonyVoicing } from '../mapping/harmony';
 import type { ScaleId } from '../mapping/scales';
 import type { ShortAxisId } from '../mapping/shortAxis';
 
@@ -28,6 +29,8 @@ export interface Settings {
   scale: ScaleId;
   snapStrength: number;
   shortAxis: ShortAxisId;
+  /** How harmony notes are chosen when the harmony axis is active. */
+  harmonyVoicing: HarmonyVoicing;
   volume: number;
   reverbAmount: number;
   /**
@@ -51,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scale: 'chromatic',
   snapStrength: 0.2,
   shortAxis: 'timbre',
+  harmonyVoicing: 'diatonic',
   volume: 0.8,
   reverbAmount: 0.12,
   ensemble: 0.75,
