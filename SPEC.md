@@ -137,17 +137,41 @@ frequency  = 440 * 2^((midiFloat - 69) / 12)
 scale      : set of pitch classes, e.g. major = {0,2,4,5,7,9,11}
 snapStrength : 0.0 .. 1.0   (0 = fully free, 1 = locked to semitones)
 
-nearest    = nearest MIDI integer whose (m mod 12) ∈ scale, to midiFloat
-blended    = midiFloat + snapStrength * (nearest - midiFloat)
+lo, hi     = consecutive scale degrees bracketing midiFloat
+half       = (hi - lo) / 2                    # half the gap to the neighbour
+lock       = snapStrength * half              # width of the locked region
+distance   = min(midiFloat - lo, hi - midiFloat)
+nearest    = the closer of lo, hi
+
+if lock >= half            -> blended = nearest            # full quantization
+if distance <= lock        -> blended = nearest            # corrected onto the note
+otherwise:
+    t       = (distance - lock) / (half - lock)            # 0 at the lock edge, 1 at the midpoint
+    blended = nearest + (midpoint - nearest) * t           # release to the midpoint
 frequency  = 440 * 2^((blended - 69) / 12)
 ```
+
+The pull is **strongest close to a degree and fades to nothing at the midpoint**
+between two degrees. Within `lock` semitones of a degree the pitch is exactly
+that degree, so a small playing error is corrected outright; beyond the locked
+region the pitch follows the finger again, so any pitch between two degrees
+stays reachable. Raising `snapStrength` widens the locked region until, at 1, the
+locked regions meet and the mapping becomes plain quantization.
+
+This is deliberately the *opposite* of a distance-proportional pull
+(`blended = midiFloat + snapStrength * (nearest - midiFloat)`), which drags
+hardest exactly where the player is furthest from a note and so makes it
+impossible to leave the scale on purpose. The correction is saturated at its
+maximum near the degree, which is also the strongest pull possible without
+overshooting the note.
 
 Properties to guarantee (unit-tested):
 
 - `snapStrength = 0` ⇒ `blended === midiFloat` (identity; pure glide).
 - `snapStrength = 1` ⇒ `blended` is exactly a scale degree.
-- Mapping is monotonic non-decreasing in `pitchPos`.
-- Nearest-note search ties break toward the lower note (deterministic).
+- Mapping is monotonic non-decreasing in `pitchPos` (no pitch jumps while sliding).
+- The correction never overshoots the degree it pulls toward.
+- Below full strength, every pitch between two degrees remains reachable.
 
 ### 5.3 Scales
 
@@ -476,7 +500,9 @@ reverb, ensemble, vibrato, scale-line opacity, polyphony.
 Pure-function coverage is where real bugs hide:
 
 - `pitch.ts`: log mapping monotonicity; `snapStrength=0` identity;
-  `snapStrength=1` lands exactly on scale degrees; clamping at 0/1; octave span
+  `snapStrength=1` lands exactly on scale degrees; the lock-and-release snap shape
+  (small errors corrected, midpoint released, no overshoot, off-scale pitches
+  reachable below full strength); clamping at 0/1; octave span
   math; tie-breaking determinism; frequency accuracy vs known MIDI values
   (A4=440, C4≈261.63).
 - `scales.ts`: each scale's pitch-class sets are correct.

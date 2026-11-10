@@ -79,9 +79,33 @@ export function nearestInScale(midi: number, scale: ScaleId): number {
 }
 
 /**
- * Soft snap: blends the continuous pitch toward the nearest scale degree.
- * `strength = 0` is the identity (free glide); `strength = 1` lands exactly on
- * a scale degree. The result is monotonic non-decreasing in `pos`.
+ * The two consecutive scale degrees bracketing `midi`: the closest degree at or
+ * below it and the closest at or above it. Both equal `midi` when it sits on a
+ * degree.
+ */
+function bracketingDegrees(midi: number, scale: ScaleId): { lo: number; hi: number } {
+  let lo = Math.floor(midi);
+  while (!isInScale(lo, scale)) lo -= 1;
+  let hi = Math.ceil(midi);
+  while (!isInScale(hi, scale)) hi += 1;
+  return { lo, hi };
+}
+
+/**
+ * Soft snap: pulls the continuous pitch onto the nearest scale degree.
+ *
+ * The pull is *strongest when you are close to a degree and fades to nothing at
+ * the midpoint between two degrees*. Within `lock` semitones of a degree the
+ * result is exactly that degree, so a small playing error is corrected outright.
+ * Outside that region the pitch follows the finger again, so any pitch between
+ * two degrees stays reachable. `strength` widens the locked region: 0 is the
+ * identity (free glide) and 1 locks the whole interval (plain quantization).
+ *
+ * A distance-proportional pull would do the opposite - drag hardest exactly
+ * where the player is furthest from a note, making it impossible to leave the
+ * scale on purpose. Saturating the correction at its maximum near the degree is
+ * also the strongest pull possible without overshooting the note, and keeping it
+ * continuous and monotonic means no pitch jumps while sliding.
  */
 export function positionToSnappedMidi(
   pos: number,
@@ -92,8 +116,27 @@ export function positionToSnappedMidi(
   const raw = positionToMidi(pos, range);
   const s = clamp01(strength);
   if (s === 0) return raw;
-  const nearest = nearestInScale(raw, scale);
-  return raw + s * (nearest - raw);
+
+  const { lo, hi } = bracketingDegrees(raw, scale);
+  if (lo === hi) return raw;
+
+  const half = (hi - lo) / 2;
+  const lock = s * half;
+  const dLo = raw - lo;
+  const dHi = hi - raw;
+  const nearest = dLo <= dHi ? lo : hi;
+
+  // At full strength the locked regions meet, leaving plain quantization.
+  if (lock >= half) return nearest;
+
+  const distance = Math.min(dLo, dHi);
+  if (distance <= lock) return nearest;
+
+  // Outside the lock the pull fades to nothing at the midpoint, so the mapping
+  // stays continuous and every pitch between two degrees remains reachable.
+  const t = (distance - lock) / (half - lock);
+  const midpoint = lo + half;
+  return nearest + (midpoint - nearest) * t;
 }
 
 /** Convenience: normalized position straight to frequency in Hz. */

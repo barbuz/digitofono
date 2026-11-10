@@ -112,7 +112,7 @@
 
     <label>
       Snap strength: {settings.snapStrength.toFixed(2)}
-      <span class="hint">0 = free glide</span>
+      <span class="hint">0 = free glide; higher corrects small errors, still free between notes</span>
       <input
         type="range"
         min="0"

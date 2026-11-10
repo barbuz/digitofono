@@ -7,8 +7,9 @@ import {
   midiToPosition,
   nearestInScale,
   positionToSnappedMidi,
+  type PitchRange,
 } from './pitch';
-import { SCALES } from './scales';
+import { SCALES, type ScaleId } from './scales';
 
 const RANGE = { baseMidi: 48, octaveSpan: 3 };
 
@@ -119,5 +120,61 @@ describe('positionToSnappedMidi', () => {
     const snapped = positionToSnappedMidi(0.37, RANGE, 'major', 0.5);
     expect(Math.abs(snapped - nearest)).toBeLessThan(Math.abs(raw - nearest));
     expect(Math.sign(snapped - raw)).toBe(Math.sign(nearest - raw));
+  });
+});
+
+describe('soft snap shape', () => {
+  // A one-octave range so a semitone is exactly 1/12 of the axis.
+  const unit: PitchRange = { baseMidi: 60, octaveSpan: 1 };
+  const at = (midi: number, scale: ScaleId, strength: number) =>
+    positionToSnappedMidi((midi - 60) / 12, unit, scale, strength);
+
+  it('locks a small error exactly onto the degree', () => {
+    // strength 0.6 => locked within 0.3 semitones of a note.
+    for (const off of [0.05, 0.1, 0.2, 0.29]) {
+      expect(at(60 + off, 'chromatic', 0.6)).toBe(60);
+      expect(at(60 - off, 'chromatic', 0.6)).toBe(60);
+    }
+  });
+
+  it('releases the pull at the midpoint between two degrees', () => {
+    // The old distance-proportional pull was strongest here; it must now be nil,
+    // otherwise the player can never leave the scale on purpose.
+    expect(at(60.5, 'chromatic', 0.6)).toBe(60.5);
+    expect(at(60.5, 'chromatic', 0.8)).toBe(60.5);
+  });
+
+  it('pulls hardest near the degree and lets go with distance', () => {
+    const pull = (off: number) => Math.abs(at(60 + off, 'chromatic', 0.6) - (60 + off));
+    expect(pull(0.05)).toBeCloseTo(0.05, 9);
+    expect(pull(0.3)).toBeCloseTo(0.3, 9);
+    // Beyond the lock the pull shrinks monotonically to zero at the midpoint.
+    expect(pull(0.35)).toBeGreaterThan(pull(0.4));
+    expect(pull(0.4)).toBeGreaterThan(pull(0.45));
+    expect(pull(0.45)).toBeGreaterThan(pull(0.5));
+    expect(pull(0.5)).toBe(0);
+  });
+
+  it('keeps every pitch between two degrees reachable below full strength', () => {
+    for (const strength of [0.3, 0.6, 0.8]) {
+      for (let target = 60.05; target < 60.5; target += 0.05) {
+        let best = Infinity;
+        for (let k = 0; k <= 2000; k += 1) {
+          best = Math.min(best, Math.abs(at(60 + (k / 2000) * 0.5, 'chromatic', strength) - target));
+        }
+        expect(best).toBeLessThan(0.001);
+      }
+    }
+  });
+
+  it('never overshoots the degree it is pulling toward', () => {
+    for (const strength of [0.2, 0.5, 0.9]) {
+      for (let raw = 60.01; raw < 61; raw += 0.01) {
+        const snapped = at(raw, 'chromatic', strength);
+        const nearest = Math.abs(raw - 60) <= Math.abs(raw - 61) ? 60 : 61;
+        expect(snapped).toBeGreaterThanOrEqual(Math.min(raw, nearest) - 1e-9);
+        expect(snapped).toBeLessThanOrEqual(Math.max(raw, nearest) + 1e-9);
+      }
+    }
   });
 });
