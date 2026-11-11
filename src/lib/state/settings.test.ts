@@ -71,5 +71,7 @@ describe('settings persistence', () => {
     const { getSettings } = await loadStore();
     expect(getSettings().shortAxis).toBe('harmony');
     expect(getSettings().harmonyVoicing).toBe('diatonic');
+    // `listen` is likewise additive and must default to off for an old blob.
+    expect(getSettings().listen).toBe(false);
   });
 });

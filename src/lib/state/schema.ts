@@ -42,6 +42,12 @@ export interface Settings {
   vibrato: number;
   /** Opacity (0..1) of the guide lines drawn at each scale step; 0 hides them. */
   scaleLines: number;
+  /**
+   * Listen to the microphone and highlight the pitch being played around the
+   * instrument. Off by default: it needs a permission prompt, so it must never
+   * be part of the first-gesture path.
+   */
+  listen: boolean;
   preset: PresetId;
 }
 
@@ -60,5 +66,6 @@ export const DEFAULT_SETTINGS: Settings = {
   ensemble: 0.75,
   vibrato: 0.2,
   scaleLines: 0.5,
+  listen: false,
   preset: 'warm',
 };

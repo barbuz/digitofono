@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Player, type ActiveTouch, type SurfaceGeometry } from '../input/player';
+  import { MicListener } from '../input/mic';
   import { scaleLines } from '../mapping/scaleLines';
+  import { midiToPosition, midiToNoteName } from '../mapping/pitch';
   import type { Settings } from '../state/schema';
 
   let { settings }: { settings: Settings } = $props();
@@ -10,11 +12,16 @@
   let container: HTMLDivElement;
   let ctx: CanvasRenderingContext2D | null = null;
   let player: Player | null = null;
+  let mic: MicListener | null = null;
   let geometry: SurfaceGeometry = {
     longLength: 1,
     shortLength: 1,
     longIsVertical: true,
   };
+
+  /** Pitch heard from the microphone, or null when nothing is playing. */
+  let heardMidi: number | null = $state(null);
+  let micError: string | null = $state(null);
 
   interface Ripple {
     x: number;
@@ -93,6 +100,33 @@
         }
         ctx.stroke();
       }
+    }
+
+    // Heard pitch: a brighter marker at the pitch coming from the microphone,
+    // using the same long-axis mapping as the guide lines so it lines up with
+    // the scale steps. Only drawn while a pitch is being detected.
+    if (heardMidi !== null) {
+      const pos = midiToPosition(heardMidi, {
+        baseMidi: settings.baseMidi,
+        octaveSpan: settings.octaveSpan,
+      });
+      const inside = pos > 0 && pos < 1;
+      ctx.save();
+      ctx.lineWidth = 2.5 * dpr;
+      ctx.strokeStyle = inside ? 'rgba(255, 230, 160, 0.9)' : 'rgba(255, 200, 120, 0.45)';
+      ctx.setLineDash(inside ? [] : [6 * dpr, 6 * dpr]);
+      ctx.beginPath();
+      if (vertical) {
+        const py = (1 - pos) * height;
+        ctx.moveTo(0, py);
+        ctx.lineTo(width, py);
+      } else {
+        const px = (1 - pos) * width;
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, height);
+      }
+      ctx.stroke();
+      ctx.restore();
     }
 
     // Active glow: a soft radial following each held finger.
@@ -177,11 +211,36 @@
 
   onDestroy(() => {
     cancelAnimationFrame(rafId);
+    mic?.stop();
   });
 
   // Keep the player in sync with settings changes.
   $effect(() => {
     player?.updateSettings(settings);
+  });
+
+  // Follow the `listen` setting. The permission prompt is exactly why this is
+  // opt-in and triggered only by the toggle, never by the first play gesture;
+  // the microphone stream is routed to the analyser only, never to the output.
+  $effect(() => {
+    if (!settings.listen) {
+      mic?.stop();
+      micError = null;
+      return;
+    }
+
+    if (!mic) {
+      mic = new MicListener({
+        onPitch: (pitch) => {
+          heardMidi = pitch ? pitch.midi : null;
+        },
+      });
+    }
+
+    void mic.start().catch((error) => {
+      micError = error instanceof Error ? error.message : String(error);
+      mic?.stop();
+    });
   });
 </script>
 
@@ -201,6 +260,18 @@
       <span class="note">{touch.noteName}</span>
     {/each}
   </div>
+
+  {#if settings.listen}
+    <div class="heard" aria-live="polite">
+      {#if micError}
+        <span class="heard-error">Microphone: {micError}</span>
+      {:else if heardMidi !== null}
+        <span class="heard-note">{midiToNoteName(heardMidi)}</span>
+      {:else}
+        <span class="heard-idle">listening…</span>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -239,5 +310,32 @@
     padding: 0.15rem 0.5rem;
     border-radius: 0.4rem;
     background: rgba(140, 200, 255, 0.08);
+  }
+
+  .heard {
+    position: absolute;
+    bottom: calc(env(safe-area-inset-bottom) + 1rem);
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+  }
+
+  .heard-note {
+    padding: 0.15rem 0.6rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 220, 150, 0.12);
+    color: rgba(255, 230, 170, 0.95);
+  }
+
+  .heard-idle,
+  .heard-error {
+    color: rgba(180, 215, 255, 0.6);
+  }
+
+  .heard-error {
+    color: rgba(255, 180, 180, 0.85);
   }
 </style>

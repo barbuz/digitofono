@@ -203,6 +203,21 @@
       />
     </label>
 
+    <label class="toggle">
+      <span class="toggle-row">
+        <input
+          type="checkbox"
+          checked={settings.listen}
+          onchange={(e) => updateSettings({ listen: e.currentTarget.checked })}
+        />
+        Listen to microphone
+      </span>
+      <span class="hint">
+        highlight the pitch of music playing around the instrument. Needs mic
+        permission; audio is analysed on-device and never recorded.
+      </span>
+    </label>
+
     <button class="reset" onclick={resetSettings}>Reset to defaults</button>
 
     <footer class="build">
@@ -267,6 +282,17 @@
   .hint {
     font-size: 0.75rem;
     opacity: 0.6;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .toggle-row input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
   }
 
   select,

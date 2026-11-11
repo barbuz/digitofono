@@ -77,6 +77,19 @@ verified on a real device.
   cap that could be lowered at runtime would not be honoured once the pool had
   grown - that is exactly why a polyphony of 1 still sounded several notes. Keep
   the cap constant.
+- Microphone listening (`settings.listen`, off by default) highlights the pitch
+  heard around the instrument. The pure detector is `mapping/pitchDetect.ts`
+  (McLeod NSDF pitch detection; framework-free and unit-tested with generated
+  sines). The browser plumbing is `input/mic.ts` (a Svelte-free class mirroring
+  `Player`: `getUserMedia` → `AnalyserNode` → `detectPitch` per rAF, with a short
+  hold so brief dropouts don't flicker the marker). `PlaySurface.svelte` draws the
+  heard pitch with the same `midiToPosition` mapping as the scale lines. Two rules
+  matter: the mic stream is connected to the analyser **only**, never to
+  `destination` (routing it to output would feed back through the phone speaker);
+  and `listen` must stay opt-in, never part of the first-gesture path, because
+  `getUserMedia` requires a permission prompt and would break the
+  "open and make a sound in one gesture" promise. `listen` is an additive field,
+  so it needs no `SETTINGS_VERSION` bump.
 
 ## Deployment
 

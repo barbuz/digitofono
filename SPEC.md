@@ -418,6 +418,12 @@ surface stays "near blank"; the instrument is heard, not read.
   setting (`scaleLines`, 0 = hidden). The tonic of each octave is drawn a little
   stronger than the other degrees. Placement reuses the pitch mapping, so a line
   sits exactly where that note sounds.
+- **Heard pitch (optional):** when `listen` is on, the microphone is analysed and
+  the pitch of music playing around the instrument is marked with a brighter line
+  on the long axis, plus a small note-name label. Off by default (it needs a
+  permission prompt, so it is never part of the first-gesture path). Detection is
+  monophonic (McLeod NSDF); the stream is analysed on-device and never recorded or
+  routed to the speakers.
 - Respect `prefers-reduced-motion`: disable expanding ripples, keep a static glow.
 
 ---
@@ -651,6 +657,7 @@ architecture does not preclude it. None of these are commitments.
 | **Per-voice detune / unison** | Two detuned oscillators per note for width (CPU-gated). |
 | **Pan as a short-axis option** | Reserved; weak on phone speakers, good on headphones. |
 | **Vibrato / modulation** | LFO-driven pitch or filter modulation from a secondary touch or tilt. |
+| **Polyphonic pitch highlighting** | Extend the microphone listener from monophonic (current) to showing several simultaneous pitches; research-grade, approximate. |
 | **Tilt / motion control** | Device orientation as an additional expressive axis. |
 | **MIDI in/out** | Web MIDI for external controllers and DAW use. |
 | **Export to audio file** | Render a performance to a downloadable file. |

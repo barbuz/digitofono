@@ -26,6 +26,7 @@ const settings: Settings = {
   ensemble: 0.3,
   vibrato: 0.2,
   scaleLines: 0,
+  listen: false,
   preset: 'warm',
 };
 
