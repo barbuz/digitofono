@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HARMONY_FULL_AT,
   HARMONY_INTERVALS_SEMITONES,
   HARMONY_VOICING_IDS,
   MAX_HARMONY_NOTES,
@@ -119,13 +120,21 @@ describe('harmonyGains', () => {
     expect(harmonyGains(1)).toEqual([1, 1, 1]);
   });
 
-  it('adds the notes one at a time as the axis advances', () => {
-    // With three notes each slice is a third wide; halfway the first note is
-    // fully in, the second is halfway, and the third has not started.
-    const gains = harmonyGains(0.5);
-    expect(gains[0]).toBeCloseTo(1, 9);
-    expect(gains[1]).toBeCloseTo(0.5, 9);
-    expect(gains[2]).toBeCloseTo(0, 9);
+  it('starts every note rising right away, nearest fastest', () => {
+    // The third (4 semitones) leads, then the fifth (7) and seventh (11); all
+    // three are already sounding once the axis has moved off 0.
+    const gains = harmonyGains(0.1);
+    expect(gains[0]).toBeGreaterThan(gains[1]);
+    expect(gains[1]).toBeGreaterThan(gains[2]);
+    expect(gains[2]).toBeGreaterThan(0);
+  });
+
+  it('brings the nearest note (the third) to full at a quarter of the way', () => {
+    expect(harmonyGains(HARMONY_FULL_AT)[0]).toBeCloseTo(1, 9);
+    // The further notes are still climbing at that point.
+    const atQuarter = harmonyGains(HARMONY_FULL_AT);
+    expect(atQuarter[1]).toBeLessThan(1);
+    expect(atQuarter[2]).toBeLessThan(atQuarter[1]);
   });
 
   it('returns one gain per harmony note', () => {
@@ -146,5 +155,16 @@ describe('harmonyGains', () => {
   it('clamps out-of-range positions', () => {
     expect(harmonyGains(-1)).toEqual([0, 0, 0]);
     expect(harmonyGains(2)).toEqual([1, 1, 1]);
+  });
+
+  it('ramps by absolute distance, so a note below the root is not slower', () => {
+    // The octaves voicing's first note sits an octave *below* the root; with
+    // distance 12 it must still ramp faster than the note two octaves above
+    // (distance 24), exactly as if it were 12 semitones above.
+    const gains = harmonyGains(0.2, 'octaves');
+    expect(gains[0]).toBeGreaterThan(gains[2]);
+    // The octave below is the voicing's nearest note (12 semitones), so it
+    // reaches full at the quarter mark just like the chord's third.
+    expect(harmonyGains(HARMONY_FULL_AT, 'octaves')[0]).toBeCloseTo(1, 9);
   });
 });

@@ -40,6 +40,14 @@ const OCTAVE_INTERVALS: readonly number[] = [-12, 12, 24];
 export const MAX_HARMONY_NOTES = HARMONY_INTERVALS_SEMITONES.length;
 
 /**
+ * Fraction of the short axis at which the *nearest* harmony note reaches full
+ * level. The farthest note reaches full at the end of the axis (1), so a note's
+ * ramp simply starts earlier and is steeper the closer its interval is to the
+ * root.
+ */
+export const HARMONY_FULL_AT = 0.25;
+
+/**
  * MIDI values of the harmony notes for `rootMidi`, one per interval, in
  * ascending order.
  *
@@ -82,17 +90,34 @@ export function harmonyMidiValues(
 }
 
 /**
- * Level of each harmony note at a short-axis position, parallel to
- * `HARMONY_INTERVALS_SEMITONES`. Note `i` fades in across its own equal slice of
- * the axis, so 0 sounds the single root note and 1 sounds the full chord; the
- * ramp within each slice keeps the morph continuous and click-free.
+ * Level of each harmony note at a short-axis position, parallel to the ratios
+ * returned by `harmonyMidiValues` (so the gains line up with the voicing's
+ * notes). At 0 the root sounds bare and at 1 the whole chord is in.
+ *
+ * Unlike a sequential fade-in, every note starts rising as soon as the axis
+ * leaves 0: a note's ramp is steeper the closer its interval is to the root,
+ * measured in semitones regardless of sign, so a note below the root ramps like
+ * one above it. The nearest note reaches full at `HARMONY_FULL_AT` and the
+ * farthest at 1, which means the last note is already audible well before the
+ * axis ends. All gains stay monotonic and continuous, so the morph is
+ * click-free.
  */
-export function harmonyGains(pos: number): number[] {
+export function harmonyGains(pos: number, voicing: HarmonyVoicing = 'diatonic'): number[] {
   const t = clamp01(pos);
-  const count = MAX_HARMONY_NOTES;
-  return Array.from({ length: count }, (_, i) => {
-    const start = i / count;
-    const end = (i + 1) / count;
-    return clamp01((t - start) / (end - start));
+  const distances = harmonyIntervals(voicing).map(Math.abs);
+  const nearest = Math.min(...distances);
+  const farthest = Math.max(...distances);
+  return distances.map((distance) => {
+    // The nearest note is full at `HARMONY_FULL_AT`, the farthest at 1; a
+    // voicing whose notes all share one distance (none do today) collapses to a
+    // single ramp.
+    const spread = (distance - nearest) / (farthest - nearest || 1);
+    const fullAt = HARMONY_FULL_AT + (1 - HARMONY_FULL_AT) * spread;
+    return clamp01(t / fullAt);
   });
+}
+
+/** The intervals `harmonyMidiValues` uses for a voicing, for parallel gains. */
+function harmonyIntervals(voicing: HarmonyVoicing): readonly number[] {
+  return voicing === 'octaves' ? OCTAVE_INTERVALS : HARMONY_INTERVALS_SEMITONES;
 }

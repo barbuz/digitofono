@@ -35,6 +35,13 @@ describe('resolveAxes', () => {
     expect(resolveAxes(settings, preset, 1).harmony).toEqual([1, 1, 1]);
   });
 
+  it('follows the selected voicing so the gains line up with the ratios', () => {
+    const settings = settingsWith({ shortAxis: 'harmony', harmonyVoicing: 'octaves' });
+    // The octave below (distance 12) is the octaves voicing's nearest note, so
+    // it is already full a quarter of the way across the axis.
+    expect(resolveAxes(settings, preset, 0.25).harmony[0]).toBeCloseTo(1, 9);
+  });
+
   it('leaves the harmony silent when it is not the short axis', () => {
     for (const shortAxis of ['timbre', 'harmonicMorph', 'volume'] as const) {
       const axes = resolveAxes(settingsWith({ shortAxis }), preset, 1);

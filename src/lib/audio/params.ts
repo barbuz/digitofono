@@ -37,7 +37,7 @@ export function resolveAxes(settings: Settings, preset: Preset, shortPos: number
       morph = shortAxisToMorph(shortPos).brightGain;
       break;
     case 'harmony':
-      harmony = harmonyGains(shortPos);
+      harmony = harmonyGains(shortPos, settings.harmonyVoicing);
       break;
     case 'volume':
       level = shortAxisToGain(shortPos);

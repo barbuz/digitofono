@@ -339,8 +339,11 @@ Stacks harmony notes above the played note to build a chord. Unlike the other
 axes this one changes *how many notes* sound, not the timbre of one:
 
 - At `shortPos = 0` the voice is the bare note.
-- The harmony notes fade in one at a time across the axis, so the middle of the
-  travel is a two-note interval and the far end is the full four-note chord.
+- Every harmony note starts fading in as soon as the axis leaves 0. A note's ramp
+  is steeper the closer its interval is to the root (measured in semitones,
+  regardless of sign, so a note below the root is treated like one above it), so
+  the nearer notes lead and the chord thickens as the finger travels. The far end
+  is the full four-note chord.
 
 The intervals are a major third, a perfect fifth and a major seventh (a major
 seventh chord), chosen by a `harmonyVoicing` setting (`mapping/harmony.ts`):
@@ -368,7 +371,11 @@ glides. Because `OscillatorNode` is single-use, all pairs are built at note onse
 (even the silent ones) so they can fade in later without an oscillator start.
 
 ```
-noteLevels[i] = clamp01((shortPos - i/N) / (1/N))   // N = number of harmony notes
+// d_i = |interval_i| in semitones; nearest and farthest are the voicing's own
+// nearest/farthest notes, so the closest reaches full at FULL_AT = 0.25 and the
+// farthest at 1.
+fullAt_i    = FULL_AT + (1 - FULL_AT) * (d_i - nearest) / (farthest - nearest)
+noteLevels[i] = clamp01(shortPos / fullAt_i)
 ```
 
 ### 7.4 Volume

@@ -49,9 +49,12 @@ verified on a real device.
   from it, so a bump starts a clean key). `settings.test.ts` pins this and fails
   if the version is not bumped.
 - The harmonizer (`mapping/harmony.ts`) is a *short-axis option*, not a separate
-  mode: at `shortPos = 0` it sounds the bare note, and harmony notes fade in one
-  at a time as the axis advances to the full four-note chord (root + major third,
-  fifth and seventh). The `harmonyVoicing` setting picks the intervals:
+  mode: at `shortPos = 0` it sounds the bare note, and every harmony note starts
+  fading in as soon as the axis advances, each at a rate set by its absolute
+  semitone distance from the root, up to the full four-note chord (root + major
+  third, fifth and seventh). The nearest note is full at `HARMONY_FULL_AT`
+  (a quarter of the way), the farthest at the end of the axis. The
+  `harmonyVoicing` setting picks the intervals:
   `diatonic` (default) snaps them to the current scale so the chord stays
   consonant everywhere; `major` uses the intervals verbatim and `octaves` spreads
   octaves around the root (one below, one and two above), both ignoring the scale.
