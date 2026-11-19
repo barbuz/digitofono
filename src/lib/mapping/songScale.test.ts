@@ -132,9 +132,12 @@ describe('selectPitchClasses', () => {
   });
 
   it('keeps a strong out-of-key note, which is a real borrowed note', () => {
-    // C major with a strong Ab: a borrowed chord, not noise.
+    // C major with a strong Ab: a borrowed chord, not noise. The key degrees
+    // have to carry a realistic spread - an all-equal chroma cannot tell a
+    // borrowed chord from the chords around it, and no recording looks like that.
     const chroma = chromaOf([0, 2, 4, 5, 7, 9, 11]);
-    chroma[8] = 0.9;
+    for (const pc of [0, 2, 4, 5, 7, 9, 11]) chroma[pc] = 0.5 + (pc % 4) * 0.05;
+    chroma[8] = 0.6;
     const key = rankKeys(chroma)[0];
     expect(selectPitchClasses(chroma, key)).toContain(8);
   });
