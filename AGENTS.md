@@ -77,6 +77,41 @@ verified on a real device.
   cap that could be lowered at runtime would not be honoured once the pool had
   grown - that is exactly why a polyphony of 1 still sounded several notes. Keep
   the cap constant.
+- Song scale learning (`SettingsPanel` -> "Learn the scale from a song") reads a
+  local audio file and lays out the notes the song actually plays as frets. The
+  pure chain is `mapping/chroma.ts` (FFT -> spectral peaks -> pitch-class
+  histogram -> tuning offset -> register) and `mapping/songScale.ts` (key
+  finding -> pitch-class selection -> axis fit); both are framework-free and
+  unit-tested, including an end-to-end `songPipeline.test.ts`. The browser
+  plumbing is `input/songFile.ts` (decode with an `OfflineAudioContext` at
+  `ANALYSIS_SAMPLE_RATE`, so decoding resamples in one pass) plus
+  `input/analysis.worker.ts`, because a minute of audio through thousands of
+  FFTs would stutter the surface on the main thread. Three rules matter:
+  - The **pitch classes are the output and the key name is secondary**. A major
+    key and its relative minor share all seven notes, so the label is genuinely
+    ambiguous while the fret set is not. `selectPitchClasses` keeps the key's
+    supported degrees plus any out-of-key note strong enough to be deliberate,
+    and falls back to the whole key when thresholds would leave fewer than
+    `MIN_PITCH_CLASSES`.
+  - Frames are **summed, not median-reduced**. A melody note played once is a
+    real note of the song and a median across frames erases it; percussive
+    frames are rejected up front by spectral flatness instead. `SUPPORT_FRACTION`
+    is set by the melody case (a bar-long note against a sustained pad carries
+    ~0.17 of the peak), so do not raise it back to a "clean" 0.2 without
+    breaking melody detection.
+  - The key finder uses the Krumhansl-Kessler profiles with **Pearson
+    correlation**, never plain cosine: a template that zeroes the notes a scale
+    omits would otherwise gain similarity from its smaller norm and a mode could
+    outscore the scale that contains the song's notes. An exact tie is a real
+    outcome (a flat set of notes fits every rotation), so `compareCandidates`
+    breaks it deterministically.
+  A learned scale is **session-only** and lives in `state/songScale.ts`, not in
+  `Settings`: it is an experiment against one track, not a preference, and
+  keeping it out is why this needed no `SETTINGS_VERSION` bump. `Player`
+  overrides `settings.scale` through `updateSongScale`, and `PlaySurface` draws
+  both the guide lines and the axis span from the song when one is loaded. Never
+  route the analysed file to `destination` - it is analysed, never played.
+
 - Microphone listening (`settings.listen`, off by default) highlights the pitch
   heard around the instrument. The pure detector is `mapping/pitchDetect.ts`
   (McLeod NSDF pitch detection; framework-free and unit-tested with generated

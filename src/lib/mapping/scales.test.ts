@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SCALES, isInScale } from './scales';
+import { SCALES, SCALE_IDS, isInScale } from './scales';
 
 describe('scales', () => {
   it('defines chromatic with all twelve pitch classes', () => {
@@ -35,4 +35,29 @@ describe('scales', () => {
     expect(isInScale(72, 'major')).toBe(true);
     expect(isInScale(-12, 'major')).toBe(true);
   });
+});
+
+describe('ScaleSpec', () => {
+  it('accepts an explicit set of pitch classes wherever a named scale works', () => {
+    const custom = [0, 3, 7, 10];
+    expect(isInScale(60, custom)).toBe(true);
+    expect(isInScale(63, custom)).toBe(true);
+    expect(isInScale(62, custom)).toBe(false);
+    expect(isInScale(61, custom)).toBe(false);
+  });
+
+  it('treats negative and high MIDI values by pitch class', () => {
+    expect(isInScale(-12, [0])).toBe(true);
+    expect(isInScale(-11, [0])).toBe(false);
+    expect(isInScale(120, [0])).toBe(true);
+  });
+
+  it('behaves identically to the named scale with the same degrees', () => {
+    for (const scale of SCALE_IDS) {
+      for (let midi = 40; midi < 80; midi += 1) {
+        expect(isInScale(midi, [...SCALES[scale]])).toBe(isInScale(midi, scale));
+      }
+    }
+  });
+
 });

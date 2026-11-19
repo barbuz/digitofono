@@ -3,16 +3,71 @@
   import { SCALE_IDS, SCALE_LABELS } from '../mapping/scales';
   import { SHORT_AXIS_IDS, SHORT_AXIS_LABELS } from '../mapping/shortAxis';
   import { HARMONY_VOICING_IDS, HARMONY_VOICING_LABELS } from '../mapping/harmony';
-  import { NOTE_NAMES } from '../mapping/pitch';
+  import { NOTE_NAMES, midiToNoteName } from '../mapping/pitch';
   import { updateSettings, resetSettings } from '../state/settings';
+  import { clearSongScale, setSongScale } from '../state/songScale';
+  import { SongAnalyser } from '../input/songFile';
   import { BUILD_INFO, formatBuildLabel } from '../version';
   import type { Settings } from '../state/schema';
   import type { ScaleId } from '../mapping/scales';
   import type { ShortAxisId } from '../mapping/shortAxis';
   import type { HarmonyVoicing } from '../mapping/harmony';
   import type { PresetId } from '../state/schema';
+  import type { SongScale } from '../mapping/songScale';
 
-  let { settings, open = $bindable(false) }: { settings: Settings; open?: boolean } = $props();
+  let {
+    settings,
+    open = $bindable(false),
+    song = $bindable(null),
+  }: {
+    settings: Settings;
+    open?: boolean;
+    song?: SongScale | null;
+  } = $props();
+
+  let analyser: SongAnalyser | null = null;
+  let analysing = $state(false);
+  let progress = $state(0);
+  let songError: string | null = $state(null);
+
+  async function onSongFile(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    // Clear immediately so picking the same file twice fires again.
+    input.value = '';
+    if (!file) return;
+
+    analyser ??= new SongAnalyser({
+      onProgress: (fraction) => (progress = fraction),
+    });
+
+    analysing = true;
+    progress = 0;
+    songError = null;
+
+    try {
+      const learned = await analyser.analyse(file);
+      if (!learned) {
+        songError = 'No clear notes found in that file.';
+        return;
+      }
+      // Opening a song is the whole point, so its scale is applied at once.
+      song = learned;
+      setSongScale(learned);
+      updateSettings({ baseMidi: learned.baseMidi, octaveSpan: learned.octaveSpan });
+    } catch (error) {
+      songError = error instanceof Error ? error.message : String(error);
+    } finally {
+      analysing = false;
+      progress = 0;
+    }
+  }
+
+  function clearSong(): void {
+    song = null;
+    clearSongScale();
+    songError = null;
+  }
 
   const baseNoteOptions = Array.from({ length: 5 }, (_, octave) =>
     NOTE_NAMES.map((name, pc) => ({
@@ -89,6 +144,33 @@
           {/each}
         </select>
       </label>
+    {/if}
+
+    {#if song}
+      <div class="song">
+        <div class="song-head">
+          <strong>{song.label}</strong>
+          <span class="hint">
+            {Math.round(song.confidence * 100)}% confident · {song.pitchClasses.length} notes
+          </span>
+        </div>
+        <span class="hint">
+          {song.pitchClasses.map((pc) => NOTE_NAMES[pc]).join(' ')} ·
+          {midiToNoteName(song.lowMidi)}–{midiToNoteName(song.highMidi)}
+          {#if Math.abs(song.tuningCents) >= 5}
+            · tuning {song.tuningCents > 0 ? '+' : ''}{song.tuningCents}¢
+          {/if}
+        </span>
+        {#if song.candidates.length > 1}
+          <span class="hint">
+            also possible: {song.candidates
+              .slice(1)
+              .map((candidate) => candidate.label)
+              .join(', ')}
+          </span>
+        {/if}
+        <button class="song-clear" onclick={clearSong}>Back to {SCALE_LABELS[settings.scale]}</button>
+      </div>
     {/if}
 
     <label>
@@ -218,6 +300,26 @@
       </span>
     </label>
 
+    <label class="file">
+      Learn the scale from a song
+      <span class="hint">
+        picks the notes an audio file uses and lays them out as frets. The file
+        is analysed on this device and never uploaded.
+      </span>
+      <input
+        type="file"
+        accept="audio/*"
+        disabled={analysing}
+        onchange={onSongFile}
+      />
+      {#if analysing}
+        <span class="hint">Listening… {Math.round(progress * 100)}%</span>
+      {/if}
+      {#if songError}
+        <span class="error">{songError}</span>
+      {/if}
+    </label>
+
     <button class="reset" onclick={resetSettings}>Reset to defaults</button>
 
     <footer class="build">
@@ -306,6 +408,43 @@
     border: 1px solid #2b3646;
     background: #1c2430;
     color: inherit;
+  }
+
+  .song {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.6rem;
+    border-radius: 0.4rem;
+    border: 1px solid #2b3646;
+    background: #1c2430;
+  }
+
+  .song-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .song-clear {
+    align-self: flex-start;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.4rem;
+    border: 1px solid #2b3646;
+    background: #232d3b;
+    color: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .error {
+    font-size: 0.75rem;
+    color: #ff9c9c;
+  }
+
+  input[type='file'] {
+    font-size: 0.8rem;
   }
 
   .reset {

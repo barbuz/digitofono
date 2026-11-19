@@ -5,6 +5,7 @@ import { PRESETS } from '../audio/presets';
 import { positionToSnappedMidi, midiToFrequency, midiToNoteName } from '../mapping/pitch';
 import { harmonyMidiValues } from '../mapping/harmony';
 import { trackCutoffForPitch } from '../mapping/shortAxis';
+import type { ScaleSpec } from '../mapping/scales';
 import type { Settings } from '../state/schema';
 
 /** Presses shorter than this become plucked notes on lift; longer ones sustain. */
@@ -53,6 +54,11 @@ export class Player {
   private settings: Settings;
   private geometry: SurfaceGeometry;
   private events: PlayerEvents;
+  /**
+   * A scale learned from a song, overriding `settings.scale` while it is set.
+   * Null means the instrument plays the built-in scale.
+   */
+  private songPitchClasses: readonly number[] | null = null;
 
   constructor(
     settings: Settings,
@@ -80,6 +86,16 @@ export class Player {
     this.geometry = geometry;
   }
 
+  /** Play a scale learned from a song, or `null` to return to the built-in one. */
+  updateSongScale(pitchClasses: readonly number[] | null): void {
+    this.songPitchClasses = pitchClasses && pitchClasses.length > 0 ? pitchClasses : null;
+  }
+
+  /** The scale actually in force: the song's when one is loaded. */
+  private get activeScale(): ScaleSpec {
+    return this.songPitchClasses ?? this.settings.scale;
+  }
+
   private applySettings(settings: Settings): void {
     const preset = PRESETS[settings.preset];
     this.engine.setPreset(preset);
@@ -103,7 +119,7 @@ export class Player {
     return positionToSnappedMidi(
       pitchPos,
       { baseMidi: this.settings.baseMidi, octaveSpan: this.settings.octaveSpan },
-      this.settings.scale,
+      this.activeScale,
       this.settings.snapStrength,
     );
   }
@@ -125,7 +141,7 @@ export class Player {
     if (this.settings.shortAxis !== 'harmony') return [];
     const rootMidi = this.midiFor(pitchPos);
     const rootHz = midiToFrequency(rootMidi);
-    return harmonyMidiValues(rootMidi, this.settings.scale, this.settings.harmonyVoicing).map(
+    return harmonyMidiValues(rootMidi, this.activeScale, this.settings.harmonyVoicing).map(
       (midi) => midiToFrequency(midi) / rootHz,
     );
   }

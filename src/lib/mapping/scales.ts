@@ -24,7 +24,6 @@ export const SCALES: Record<ScaleId, readonly number[]> = {
 };
 
 export const SCALE_IDS = Object.keys(SCALES) as ScaleId[];
-
 export const SCALE_LABELS: Record<ScaleId, string> = {
   chromatic: 'Chromatic',
   major: 'Major',
@@ -36,7 +35,19 @@ export const SCALE_LABELS: Record<ScaleId, string> = {
   mixolydian: 'Mixolydian',
 };
 
-export function isInScale(midi: number, scale: ScaleId): boolean {
+/**
+ * A scale is either one of the named presets or an explicit set of pitch
+ * classes, which is how a scale learned from a song is passed around. The
+ * mapping layer only ever needs the pitch classes, so both forms work
+ * everywhere `ScaleId` used to.
+ */
+export type ScaleSpec = ScaleId | readonly number[];
+
+export function scalePitchClasses(scale: ScaleSpec): readonly number[] {
+  return typeof scale === 'string' ? SCALES[scale] : scale;
+}
+
+export function isInScale(midi: number, scale: ScaleSpec): boolean {
   const pc = ((midi % 12) + 12) % 12;
-  return SCALES[scale].includes(pc);
+  return scalePitchClasses(scale).includes(pc);
 }

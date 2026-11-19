@@ -4,9 +4,14 @@
   import { MicListener } from '../input/mic';
   import { scaleLines } from '../mapping/scaleLines';
   import { midiToPosition, midiToNoteName } from '../mapping/pitch';
+  import type { ScaleSpec } from '../mapping/scales';
   import type { Settings } from '../state/schema';
+  import type { SongScale } from '../mapping/songScale';
 
-  let { settings }: { settings: Settings } = $props();
+  let {
+    settings,
+    song = null,
+  }: { settings: Settings; song?: SongScale | null } = $props();
 
   let canvas: HTMLCanvasElement;
   let container: HTMLDivElement;
@@ -34,6 +39,22 @@
   let rafId = 0;
   let dpr = 1;
   let reducedMotion = false;
+
+  /**
+   * The scale the instrument is playing: a song's pitch classes when one is
+   * loaded, otherwise the built-in scale from the settings.
+   */
+  const activeScale = $derived<ScaleSpec>(song ? song.pitchClasses : settings.scale);
+
+  /**
+   * The range the axis spans. A song brings its own, fitted to its register, so
+   * its notes spread across the whole surface instead of bunching at one end.
+   */
+  const activeRange = $derived(
+    song
+      ? { baseMidi: song.baseMidi, octaveSpan: song.octaveSpan }
+      : { baseMidi: settings.baseMidi, octaveSpan: settings.octaveSpan },
+  );
 
   function measure(): void {
     const rect = container.getBoundingClientRect();
@@ -78,10 +99,7 @@
     // Scale guide lines: one per step of the current scale, so the player can
     // see where the notes are. Opacity 0 hides them entirely.
     if (settings.scaleLines > 0.01) {
-      const lines = scaleLines(
-        { baseMidi: settings.baseMidi, octaveSpan: settings.octaveSpan },
-        settings.scale,
-      );
+      const lines = scaleLines(activeRange, activeScale);
       ctx.lineWidth = 1 * dpr;
       for (const line of lines) {
         const alpha = settings.scaleLines * (line.isTonic ? 1 : 0.6);
@@ -106,10 +124,7 @@
     // using the same long-axis mapping as the guide lines so it lines up with
     // the scale steps. Only drawn while a pitch is being detected.
     if (heardMidi !== null) {
-      const pos = midiToPosition(heardMidi, {
-        baseMidi: settings.baseMidi,
-        octaveSpan: settings.octaveSpan,
-      });
+      const pos = midiToPosition(heardMidi, activeRange);
       const inside = pos > 0 && pos < 1;
       ctx.save();
       ctx.lineWidth = 2.5 * dpr;
@@ -217,6 +232,11 @@
   // Keep the player in sync with settings changes.
   $effect(() => {
     player?.updateSettings(settings);
+  });
+
+  // A learned scale replaces the built-in one until it is cleared.
+  $effect(() => {
+    player?.updateSongScale(song ? song.pitchClasses : null);
   });
 
   // Follow the `listen` setting. The permission prompt is exactly why this is

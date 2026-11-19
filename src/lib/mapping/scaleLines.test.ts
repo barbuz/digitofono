@@ -75,3 +75,29 @@ describe('scaleLines', () => {
     expect(lines[0].pos).toBe(0);
   });
 });
+
+describe('scaleLines with a learned song scale', () => {
+  it('draws a line on every song note and no other', () => {
+    const songRange: PitchRange = { baseMidi: 54, octaveSpan: 2.5 };
+    const pitchClasses = [0, 4, 7, 9, 11];
+    const lines = scaleLines(songRange, pitchClasses);
+
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(pitchClasses).toContain(((line.midi % 12) + 12) % 12);
+    }
+    // A pitch class the song never uses must not get a guide line.
+    expect(lines.some((line) => ((line.midi % 12) + 12) % 12 === 1)).toBe(false);
+  });
+
+  it('puts the lines where the notes would actually sound', () => {
+    const songRange: PitchRange = { baseMidi: 54, octaveSpan: 2.5 };
+    const lines = scaleLines(songRange, [0, 4, 7]);
+    for (const line of lines) {
+      expect(line.pos).toBeCloseTo(
+        (line.midi - songRange.baseMidi) / (12 * songRange.octaveSpan),
+        10,
+      );
+    }
+  });
+});
