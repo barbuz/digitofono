@@ -1,5 +1,5 @@
 import { clamp01, nearestInScale } from './pitch';
-import { isInScale, type ScaleId } from './scales';
+import { isInScale, type ScaleSpec } from './scales';
 
 /**
  * How the harmony notes above the root are chosen.
@@ -64,7 +64,7 @@ export const HARMONY_FULL_AT = 0.25;
  */
 export function harmonyMidiValues(
   rootMidi: number,
-  scale: ScaleId,
+  scale: ScaleSpec,
   voicing: HarmonyVoicing = 'diatonic',
 ): number[] {
   if (voicing === 'octaves') {

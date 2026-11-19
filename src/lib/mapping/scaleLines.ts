@@ -1,4 +1,4 @@
-import { isInScale, type ScaleId } from './scales';
+import { isInScale, type ScaleSpec } from './scales';
 import { midiToPosition, type PitchRange } from './pitch';
 
 /** A single scale step, placed along the long axis of the playing surface. */
@@ -18,7 +18,7 @@ export interface ScaleLine {
  * uses the same position mapping as playback: a line sits exactly where the
  * snapped pitch for that note would be played.
  */
-export function scaleLines(range: PitchRange, scale: ScaleId): ScaleLine[] {
+export function scaleLines(range: PitchRange, scale: ScaleSpec): ScaleLine[] {
   const lowest = Math.ceil(range.baseMidi);
   const highest = Math.floor(range.baseMidi + 12 * range.octaveSpan);
   const tonicPc = ((Math.round(range.baseMidi) % 12) + 12) % 12;

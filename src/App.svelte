@@ -2,11 +2,12 @@
   import PlaySurface from './lib/ui/PlaySurface.svelte';
   import SettingsPanel from './lib/ui/SettingsPanel.svelte';
   import { settings } from './lib/state/settings';
+  import { songScale } from './lib/state/songScale';
 
   let panelOpen = $state(false);
 </script>
 
-<PlaySurface settings={$settings} />
+<PlaySurface settings={$settings} song={$songScale.song} />
 
 <button
   class="gear"

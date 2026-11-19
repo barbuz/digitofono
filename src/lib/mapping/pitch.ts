@@ -1,4 +1,7 @@
-import { isInScale, type ScaleId } from './scales';
+import { NOTE_NAMES } from './noteNames';
+import { isInScale, type ScaleSpec } from './scales';
+
+export { NOTE_NAMES };
 
 export const A4_MIDI = 69;
 export const A4_HZ = 440;
@@ -11,20 +14,6 @@ export function frequencyToMidi(freq: number): number {
   return A4_MIDI + 12 * Math.log2(freq / A4_HZ);
 }
 
-export const NOTE_NAMES = [
-  'C',
-  'C#',
-  'D',
-  'D#',
-  'E',
-  'F',
-  'F#',
-  'G',
-  'G#',
-  'A',
-  'A#',
-  'B',
-] as const;
 
 /** Scientific pitch notation, e.g. 60 -> "C4", 69 -> "A4". */
 export function midiToNoteName(midi: number): string {
@@ -57,7 +46,7 @@ export function midiToPosition(midi: number, range: PitchRange): number {
  * Nearest scale degree to `midi`. Ties break toward the lower note so the
  * result is deterministic.
  */
-export function nearestInScale(midi: number, scale: ScaleId): number {
+export function nearestInScale(midi: number, scale: ScaleSpec): number {
   const lower = Math.floor(midi);
   const upper = Math.ceil(midi);
 
@@ -83,7 +72,7 @@ export function nearestInScale(midi: number, scale: ScaleId): number {
  * below it and the closest at or above it. Both equal `midi` when it sits on a
  * degree.
  */
-function bracketingDegrees(midi: number, scale: ScaleId): { lo: number; hi: number } {
+function bracketingDegrees(midi: number, scale: ScaleSpec): { lo: number; hi: number } {
   let lo = Math.floor(midi);
   while (!isInScale(lo, scale)) lo -= 1;
   let hi = Math.ceil(midi);
@@ -110,7 +99,7 @@ function bracketingDegrees(midi: number, scale: ScaleId): { lo: number; hi: numb
 export function positionToSnappedMidi(
   pos: number,
   range: PitchRange,
-  scale: ScaleId,
+  scale: ScaleSpec,
   strength: number,
 ): number {
   const raw = positionToMidi(pos, range);
@@ -143,7 +132,7 @@ export function positionToSnappedMidi(
 export function positionToFrequency(
   pos: number,
   range: PitchRange,
-  scale: ScaleId,
+  scale: ScaleSpec,
   strength: number,
 ): number {
   return midiToFrequency(positionToSnappedMidi(pos, range, scale, strength));

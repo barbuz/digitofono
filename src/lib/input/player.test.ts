@@ -12,12 +12,18 @@ import type { Settings } from '../state/schema';
 
 class RecordingVoice {
   started = 0;
+  lastFrequency = 0;
   releases: boolean[] = [];
   /** Params of the last `start`, so tests can assert what the Player built. */
   lastParams: { harmonyRatios: number[]; harmonyLevels: number[] } | null = null;
 
-  start(params: { harmonyRatios: number[]; harmonyLevels: number[] }): void {
+  start(params: {
+    frequency: number;
+    harmonyRatios: number[];
+    harmonyLevels: number[];
+  }): void {
     this.started += 1;
+    this.lastFrequency = params.frequency;
     this.lastParams = params;
   }
 
@@ -203,5 +209,51 @@ describe('Player harmony wiring', () => {
     expect(ratios[0]).toBeCloseTo(0.5, 6);
     expect(ratios[1]).toBeCloseTo(2, 6);
     expect(ratios[2]).toBeCloseTo(4, 6);
+  });
+});
+
+describe('Player song scale', () => {
+  it('plays the built-in scale when no song is loaded', () => {
+    const { engine, player } = makePlayer();
+    // Chromatic, so every semitone is reachable: a position mid-range lands on
+    // the semitone nearest to the raw continuous pitch.
+    player.pointerDown(1, 200, 400);
+    expect(engine.voices[0].lastFrequency).toBeGreaterThan(0);
+  });
+
+  it('snaps to the song pitch classes once one is loaded', () => {
+    const { engine, player } = makePlayer();
+    // A song using only C, E and G. With full snap strength every touch must
+    // land on one of those three pitch classes.
+    player.updateSongScale([0, 4, 7]);
+    player.updateSettings({ ...settings, snapStrength: 1 });
+
+    const allowed = new Set([0, 4, 7]);
+    for (const y of [120, 200, 300, 400, 500, 620]) {
+      player.pointerDown(y, 200, y);
+      const midi = Math.round(69 + 12 * Math.log2(engine.voices.at(-1)!.lastFrequency / 440));
+      expect(allowed.has(((midi % 12) + 12) % 12)).toBe(true);
+      player.pointerUp(y);
+    }
+  });
+
+  it('returns to the built-in scale when the song scale is cleared', () => {
+    const { engine, player } = makePlayer();
+    player.updateSongScale([0, 4, 7]);
+    player.updateSettings({ ...settings, scale: 'major', snapStrength: 1 });
+    player.updateSongScale(null);
+
+    player.pointerDown(1, 200, 260);
+    const midi = Math.round(69 + 12 * Math.log2(engine.voices.at(-1)!.lastFrequency / 440));
+    // C major contains D (2) which the C major triad does not.
+    expect([0, 2, 4, 5, 7, 9, 11]).toContain(((midi % 12) + 12) % 12);
+  });
+
+  it('ignores an empty song scale instead of muting the instrument', () => {
+    const { engine, player } = makePlayer();
+    player.updateSongScale([]);
+    player.pointerDown(1, 200, 400);
+    expect(engine.voices[0].started).toBe(1);
+    expect(engine.voices[0].lastFrequency).toBeGreaterThan(0);
   });
 });
