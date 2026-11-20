@@ -99,6 +99,26 @@ verified on a real device.
     is set by the melody case (a bar-long note against a sustained pad carries
     ~0.17 of the peak), so do not raise it back to a "clean" 0.2 without
     breaking melody detection.
+  - `MAX_FLATNESS` is **0.8, and it is measured on real music, not on tones**.
+    This is the one threshold that must never be "tidied" back down. Spectral
+    flatness is taken over an absolute band, so it scales with how much the
+    recording's noise floor fills that band: a synthetic sine scores ~0.0, but a
+    mastered pop mix scores ~0.12 even on its most tonal frames, ~0.52 at the
+    median and ~0.74 near the top, because cymbals and mix noise lift every
+    frame. The original 0.12 cutoff rejected 99.96% of a real MP3's frames, so
+    `analyzeChroma` returned null and the UI reported "no clear notes found in
+    the file" for nearly every real song. 0.8 keeps music even with 40% added
+    noise (that peaks at 0.77) and still rejects white noise (0.83-0.85). Do not
+    replace it with a percentile cut either: that keeps the *most* tonal frames,
+    which are the ones without the melody, so it silently drops melody notes.
+  - Out-of-key notes are judged against the **median in-key note**
+    (`OUT_OF_KEY_RATIO`), never against the loudest pitch class. In a real mix
+    the weakest of the twelve bins sits near half the strongest, so a bar
+    measured from the peak admits all twelve notes to every song; the median
+    tracks each recording's own floor. `songPipeline.test.ts` synthesises a
+    dense mix - chords, melody, kick, hats and a noise floor - in eight keys and
+    asserts the exact fret set, plus a guard that unpitched noise still yields
+    null. Any change to the gates or thresholds must keep those passing.
   - The key finder uses the Krumhansl-Kessler profiles with **Pearson
     correlation**, never plain cosine: a template that zeroes the notes a scale
     omits would otherwise gain similarity from its smaller norm and a mode could

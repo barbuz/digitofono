@@ -82,10 +82,20 @@ const CANDIDATE_SCALES: readonly ScaleId[] = [
 export const SUPPORT_FRACTION = 0.12;
 
 /**
- * An out-of-key note must be this strong to be added anyway. Passing tones and
- * borrowed chords are real notes in the song; a weak bin is just noise.
+ * An out-of-key note must be at least this many times the *typical in-key
+ * note* to be added anyway, so a passing tone or a borrowed chord still gets a
+ * fret.
+ *
+ * Measured against the key's own median rather than against the loudest pitch
+ * class, because the chroma of a real mix has no quiet bins to compare to: the
+ * weakest of the twelve sits around half the strongest, since every pitch class
+ * picks up some bleed from a dense arrangement. An absolute bar would therefore
+ * admit all twelve notes to every song, which is what it used to do. The median
+ * in-key note tracks each recording's own floor, so the bar lands where the
+ * song's real notes are. A borrowed chord is as loud as the chords around it,
+ * so "as strong as the typical in-key note" is the right height for the bar.
  */
-export const STRONG_FRACTION = 0.45;
+export const OUT_OF_KEY_RATIO = 1;
 
 /** Below this many present pitch classes the recording is not a song. */
 export const MIN_PITCH_CLASSES = 3;
@@ -227,15 +237,24 @@ export function selectPitchClasses(chroma: readonly number[], key: KeyCandidate 
   if (!(peak > 0)) return [];
 
   const support = peak * SUPPORT_FRACTION;
-  const strong = peak * STRONG_FRACTION;
   const degrees = key
     ? new Set(SCALES[key.scale].map((degree) => ((key.tonic + degree) % 12 + 12) % 12))
     : null;
 
+  // Out-of-key notes are judged against the median in-key note, not the peak:
+  // see OUT_OF_KEY_RATIO for why an absolute bar cannot work. With no key there
+  // is no notion of "out of key", so every present note is taken.
+  let outOfKeyBar = support;
+  if (degrees) {
+    const inKey = [...degrees].map((pc) => chroma[pc]).sort((a, b) => a - b);
+    const median = inKey[Math.floor(inKey.length / 2)];
+    outOfKeyBar = median * OUT_OF_KEY_RATIO;
+  }
+
   const selected: number[] = [];
   for (let pc = 0; pc < 12; pc += 1) {
     const inKey = degrees ? degrees.has(pc) : false;
-    if (inKey ? chroma[pc] >= support : chroma[pc] >= strong) selected.push(pc);
+    if (inKey ? chroma[pc] >= support : chroma[pc] >= outOfKeyBar) selected.push(pc);
   }
 
   // A threshold that guts the key (a sparse arrangement, a quiet section) is
