@@ -37,6 +37,7 @@ function tonalChroma(tonic: number, scale: 'major' | 'naturalMinor'): number[] {
 function result(overrides: Partial<ChromaResult> = {}): ChromaResult {
   return {
     chroma: tonalChroma(0, 'major'),
+    bass: new Array<number>(12).fill(0),
     tuningCents: 0,
     lowMidi: 55,
     highMidi: 79,
@@ -227,5 +228,71 @@ describe('songScaleFromChroma', () => {
   it('returns null when the chroma is too sparse to be a song', () => {
     expect(songScaleFromChroma(result({ chroma: new Array(12).fill(0) }))).toBeNull();
     expect(songScaleFromChroma(result({ chroma: chromaOf([0]) }))).toBeNull();
+  });
+});
+
+describe('bass prior', () => {
+  it('scores the bass note higher as a tonic', () => {
+    // The mechanism, stated plainly: a key whose note is in the bass must gain
+    // exactly the prior, and a key whose note is not must gain nothing. This is
+    // what lets the bass settle a key the notes alone leave open.
+    const chroma = tonalChroma(0, 'major');
+    const bass = new Array<number>(12).fill(0);
+    bass[9] = 1;
+
+    const plain = rankKeys(chroma);
+    const withBass = rankKeys(chroma, bass);
+    const scoreOf = (list: typeof plain, tonic: number, scale: string) =>
+      list.find((candidate) => candidate.tonic === tonic && candidate.scale === scale)!;
+
+    const aMinorPlain = scoreOf(plain, 9, 'naturalMinor');
+    const aMinorBass = scoreOf(withBass, 9, 'naturalMinor');
+    expect(aMinorBass.score).toBeGreaterThan(aMinorPlain.score);
+
+    // A key that does not sit on the bass note gets no boost at all.
+    const cMajorPlain = scoreOf(plain, 0, 'major');
+    const cMajorBass = scoreOf(withBass, 0, 'major');
+    expect(cMajorBass.score).toBeCloseTo(cMajorPlain.score, 10);
+  });
+
+  it('leaves the ranking alone when there is no pitched bass', () => {
+    // An all-zero profile means "no evidence". A flat one is not evidence
+    // either, so neither may move the ranking.
+    const chroma = tonalChroma(0, 'major');
+    const plain = rankKeys(chroma).map((candidate) => candidate.score);
+    const zeros = rankKeys(chroma, new Array<number>(12).fill(0)).map((c) => c.score);
+    const flat = rankKeys(chroma, new Array<number>(12).fill(0.5)).map((c) => c.score);
+
+    expect(zeros).toEqual(plain);
+    expect(flat).toEqual(plain);
+  });
+
+  it('does not overrule a template that clearly fits one key', () => {
+    // A C major passage whose bass happens to sit on G (the dominant) must stay
+    // C major. A prior heavy enough to rename it "G mixolydian" would be worse
+    // than no prior at all, so the weight is bounded by this margin.
+    const bass = new Array<number>(12).fill(0);
+    bass[7] = 1;
+    const song = songScaleFromChroma(result({ bass }));
+
+    expect(song!.tonic).toBe(0);
+    expect(song!.scale).toBe('major');
+  });
+
+  it('reports low confidence when the prior, not the notes, picked the key', () => {
+    // Confidence is about the notes. If the bass is the only reason the key is
+    // named, the honest answer is that the notes did not decide it. Here the
+    // notes fit F mixolydian best and the bass drags the answer to C.
+    const chroma = tonalChroma(5, 'major');
+    const bass = new Array<number>(12).fill(0);
+    bass[0] = 1;
+
+    const song = songScaleFromChroma(result({ chroma, bass }));
+
+    expect(song).not.toBeNull();
+    const notesOnly = songScaleFromChroma(result({ chroma }))!;
+    if (song!.tonic !== notesOnly.tonic) {
+      expect(song!.confidence).toBeLessThan(0.1);
+    }
   });
 });

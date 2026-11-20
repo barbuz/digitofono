@@ -16,8 +16,16 @@ import type { ChromaResult } from './chroma';
 export interface KeyCandidate {
   tonic: number;
   scale: ScaleId;
-  /** Template correlation minus the out-of-key penalty. */
+  /** Template fit plus the bass prior: what the ranking sorts on. */
   score: number;
+  /**
+   * Template fit alone, without the bass prior.
+   *
+   * Confidence is measured from this, because the prior is evidence from
+   * outside the chroma and counting it would make a bass-heavy mix look
+   * certain about a key its notes fit ambiguously.
+   */
+  templateScore: number;
   label: string;
 }
 
@@ -103,6 +111,22 @@ export const MIN_PITCH_CLASSES = 3;
 /** Weight of the out-of-key energy subtracted from the template correlation. */
 const OUTSIDE_PENALTY = 0.35;
 
+/**
+ * How much a note being the bass note argues for it being the tonic.
+ *
+ * The template alone cannot separate a mode from its relatives, because they
+ * share their notes; only the bass says which note is home. A mastered mix puts
+ * far more energy in the bass than the profile expects, so without this a song
+ * whose bass sits on C can be named after the F chord above it.
+ *
+ * The value is deliberately small: it is a tie-breaker, not a decision. On the
+ * reference track the prior has to move a 0.011 template margin, while a clear
+ * fit (a C major passage with G in the bass) wins by 0.082 and must survive.
+ * Any weight between those two does both; 0.04 sits near their geometric middle
+ * so a little extra evidence either way does not flip the outcome.
+ */
+const BASS_TONIC_WEIGHT = 0.04;
+
 /** Rotation of a profile by `tonic` semitones, giving a 12-vector. */
 function rotate(profile: readonly number[], tonic: number): number[] {
   const template = new Array<number>(12).fill(0);
@@ -173,10 +197,19 @@ function correlation(a: readonly number[], b: readonly number[]): number {
  * than ignored: the better fit explains the song's notes *and* leaves little
  * unexplained, which is what separates C major from, say, F major on the same
  * material.
+ *
+ * `bass` is the bass-band profile from `analyzeChroma`. It is optional so the
+ * function stays usable on a bare chroma, and it only ever breaks ties between
+ * keys that fit the notes equally well.
  */
-export function rankKeys(chroma: readonly number[]): KeyCandidate[] {
+export function rankKeys(chroma: readonly number[], bass?: readonly number[]): KeyCandidate[] {
   const total = chroma.reduce((sum, value) => sum + value, 0);
   if (!(total > 0)) return [];
+
+  // Only a bass profile with a clear strongest note carries tonic information;
+  // a flat one is a recording with no pitched bass, not twelve equal tonics.
+  const bassPeak = bass ? Math.max(...bass) : 0;
+  const useBass = bass !== undefined && bassPeak > 0.5;
 
   const candidates: KeyCandidate[] = [];
   for (const scale of CANDIDATE_SCALES) {
@@ -186,10 +219,14 @@ export function rankKeys(chroma: readonly number[]): KeyCandidate[] {
       for (let pc = 0; pc < 12; pc += 1) {
         if (template[pc] === 0) outside += chroma[pc];
       }
+      const prior = useBass && bass ? BASS_TONIC_WEIGHT * (bass[tonic] ?? 0) : 0;
+      const templateScore =
+        correlation(chroma, template) - OUTSIDE_PENALTY * (outside / total);
       candidates.push({
         tonic,
         scale,
-        score: correlation(chroma, template) - OUTSIDE_PENALTY * (outside / total),
+        score: templateScore + prior,
+        templateScore,
         label: `${NOTE_NAMES[tonic]} ${SCALE_LABELS[scale].toLowerCase()}`,
       });
     }
@@ -288,13 +325,22 @@ export function fitRange(
 export function songScaleFromChroma(result: ChromaResult): SongScale | null {
   if (presentPitchClasses(result.chroma).length < MIN_PITCH_CLASSES) return null;
 
-  const candidates = rankKeys(result.chroma);
+  const candidates = rankKeys(result.chroma, result.bass);
   const key = candidates[0] ?? null;
   const pitchClasses = selectPitchClasses(result.chroma, key);
   if (pitchClasses.length < MIN_PITCH_CLASSES) return null;
 
-  const runnerUp = candidates[1];
-  const margin = key && runnerUp ? key.score - runnerUp.score : key ? 1 : 0;
+  // Confidence answers "does the chroma actually prefer the key we named?".
+  // Comparing against the next candidate in *score* order would be flattering,
+  // because the bass prior reorders that list: it would measure the chosen key
+  // against a rival the prior already demoted. Comparing against the best
+  // template fit among all other keys instead means a key that only won because
+  // of the prior scores zero, which is the honest answer - the notes alone did
+  // not pick it.
+  const bestOther = candidates
+    .filter((candidate) => candidate !== key)
+    .reduce((best, candidate) => Math.max(best, candidate.templateScore), -Infinity);
+  const margin = key ? key.templateScore - bestOther : 0;
   const { baseMidi, octaveSpan } = fitRange(result.lowMidi, result.highMidi);
 
   return {

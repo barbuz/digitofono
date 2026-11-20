@@ -118,3 +118,76 @@ describe('analyzeChroma', () => {
     expect(fractions.every((value) => value >= 0 && value <= 1)).toBe(true);
   });
 });
+
+describe('bass profile', () => {
+  /** A bass line: long low notes, the way a real one is played. */
+  function bassLine(notes: number[], secondsEach = 2): Float32Array {
+    const buffer = new Float32Array(Math.ceil(SAMPLE_RATE * (notes.length * secondsEach + 2)));
+    notes.forEach((midi, index) => {
+      addTone(buffer, index * secondsEach, secondsEach, midi, 0.5);
+    });
+    return buffer;
+  }
+
+  it('names the lowest voice, which is what tells a key from its relatives', () => {
+    // A C major triad cannot say whether the key is C, or F, or A minor: they
+    // share these notes. The bass can.
+    const result = analyzeChroma(bassLine([36, 36, 48, 36]), SAMPLE_RATE);
+
+    expect(result).not.toBeNull();
+    expect(result!.bass[0]).toBeCloseTo(1, 1);
+    expect(result!.bass[5]).toBeLessThan(0.2);
+  });
+
+  it('follows a bass line that moves', () => {
+    const result = analyzeChroma(bassLine([36, 43, 36, 43]), SAMPLE_RATE);
+
+    expect(result).not.toBeNull();
+    // C and G share the profile roughly evenly, and nothing else competes.
+    expect(result!.bass[0]).toBeGreaterThan(0.4);
+    expect(result!.bass[7]).toBeGreaterThan(0.4);
+    expect(result!.bass[1]).toBeLessThan(0.2);
+    expect(result!.bass[2]).toBeLessThan(0.2);
+  });
+
+  it('ignores a kick drum, which lives in the same band but is not a note', () => {
+    // A kick is a fast downward sweep, loud and tonal enough to pass a flatness
+    // gate, and it crosses every pitch class on the way down. It has no
+    // harmonics, which is the only thing that separates it from a bass note.
+    // Without this gate a four-on-the-floor track votes for a random key.
+    const buffer = new Float32Array(Math.ceil(SAMPLE_RATE * 8));
+    for (let beat = 0; beat < 16; beat += 1) {
+      const start = Math.floor(beat * 0.5 * SAMPLE_RATE);
+      for (let i = 0; i < 0.1 * SAMPLE_RATE && start + i < buffer.length; i += 1) {
+        const t = i / SAMPLE_RATE;
+        buffer[start + i] +=
+          0.45 * Math.exp(-t * 24) * Math.sin(2 * Math.PI * (55 * Math.exp(-t * 30) + 45) * t);
+      }
+    }
+
+    const result = analyzeChroma(buffer, SAMPLE_RATE);
+
+    expect(result).not.toBeNull();
+    expect(Math.max(...result!.bass)).toBe(0);
+  });
+
+  it('reports no bass rather than a guess when there is none', () => {
+    // All zeros means "no evidence", which the key finder must not read as
+    // twelve equally likely tonics.
+    const result = analyzeChroma(melody([72, 74, 76, 79]), SAMPLE_RATE);
+
+    expect(result).not.toBeNull();
+    expect(result!.bass.every((value) => value === 0)).toBe(true);
+  });
+
+  it('normalizes the profile so only its shape is used', () => {
+    const quiet = analyzeChroma(bassLine([36, 36, 48]), SAMPLE_RATE);
+    const loud = analyzeChroma(bassLine([36, 36, 48]).map((value) => value * 0.25), SAMPLE_RATE);
+
+    expect(quiet).not.toBeNull();
+    expect(loud).not.toBeNull();
+    quiet!.bass.forEach((value, index) => {
+      expect(value).toBeCloseTo(loud!.bass[index], 2);
+    });
+  });
+});

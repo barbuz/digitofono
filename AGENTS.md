@@ -145,6 +145,39 @@ verified on a real device.
   `getUserMedia` requires a permission prompt and would break the
   "open and make a sound in one gesture" promise. `listen` is an additive field,
   so it needs no `SETTINGS_VERSION` bump.
+- Song import (`input/songFile.ts` → `mapping/chroma.ts` → `mapping/songScale.ts`)
+  lays out frets from an audio file. `chroma.ts` runs two passes: the main one
+  over 110-2000 Hz, which finds the notes, and `analyseBass` over 55-165 Hz,
+  which finds the tonic. Both matter, for different reasons.
+- The bass pass exists because the notes alone cannot name a key: C major, F
+  major and A minor share the same pitch classes, and only the bass says which
+  is home. Its band must reach E3 (~165 Hz), not stop at E2. A bass line sits
+  about an octave above what a listener calls "the bass", so a band that stops at
+  130 Hz cannot see a bass note at D3 (147 Hz) at all and instead latches onto an
+  octave-below artifact of whatever else is sounding - which named A as the tonic
+  of a D major test passage.
+- The bass pass must reject a kick drum, which lives in the same band: a kick is a
+  fast downward sweep, loud and tonal enough to pass a flatness gate, and it
+  crosses every pitch class on the way down. Harmonics are the only discriminator,
+  and they must be measured *relative to the peak's own fundamental*, not to the
+  band's median. The median of a wide band is dominated by noise and drums, so it
+  collapses as the band widens and the gate silently stops working. A kick scores
+  ~0.10, real bass ~0.25, a clean bass tone ~0.34; the threshold is 0.18.
+- `analyseBass` returns all-zeros when it finds no pitched bass. That is "no
+  evidence", and `rankKeys` must only apply `BASS_TONIC_WEIGHT` when the profile
+  is non-zero, or a bass-free track would get a random tonic bonus.
+- Confidence is measured on `templateScore` (the template fit alone), against the
+  best-fitting *other* key - not against the next entry in score order. The bass
+  prior reorders that list, so comparing to the runner-up in score order measures
+  the chosen key against a rival the prior already demoted and overclaims. A key
+  that only won because of the prior correctly reports low confidence.
+- Known limitation: a semitone apart at A3 (207.65 vs 220 Hz) is not a resolution
+  problem - at 11 kHz with a 4096 frame the FFT already has ~4.9 bins per semitone
+  there. The main pass counts *peaks* and weights them by `sqrt`, so a weak
+  spectral smear counts nearly as much as a real note. High-resolution analysis of
+  the reference track shows the Ab band actually holds more energy than A (1.24x),
+  yet A wins on peak count. Fixing this means an energy-based chroma rather than
+  peak counting; it is a larger change and not yet made.
 
 ## Deployment
 

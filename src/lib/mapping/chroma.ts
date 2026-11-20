@@ -11,6 +11,15 @@ import { Fft } from './fft';
 export interface ChromaResult {
   /** 12 weights, index 0 = C, normalized so the strongest pitch class is 1. */
   chroma: number[];
+  /**
+   * 12 weights for the bass band only, normalized so the strongest is 1.
+   *
+   * The main chroma cannot say which note is the tonic: it says which notes the
+   * song uses, and a mode and its relative modes use the same ones. The bass
+   * does say it, because a song's harmony is anchored to the lowest voice, so
+   * this is measured separately and used as a prior when naming the key.
+   */
+  bass: number[];
   /** Estimated tuning offset of the recording in cents, -50..50. */
   tuningCents: number;
   /** 5th and 95th percentile of spectral energy, as continuous MIDI values. */
@@ -19,16 +28,61 @@ export interface ChromaResult {
 }
 
 /**
- * 110 Hz (A2) is the lowest fundamental worth trusting: a semitone there is
- * under three FFT bins wide, so lower notes smear into their neighbours. Their
- * harmonics carry the same pitch class anyway, so nothing is lost by ignoring
- * the fundamentals themselves.
+ * 110 Hz (A2) is the lowest fundamental the *main* pass trusts: at 11 kHz and a
+ * 4096-point frame a semitone there is under three FFT bins wide, so lower
+ * notes smear into their neighbours and their harmonics are the only clue left.
+ *
+ * Harmonics do not substitute for the fundamental, though, which is what this
+ * cutoff used to assume. A note below the cutoff cannot be pruned either, so its
+ * overtones are counted as notes of their own: C2's fifth harmonic is E, and
+ * that phantom E turns a minor key major. The bass is therefore measured in a
+ * separate pass with a frame long enough to resolve it - see `BASS_*` - rather
+ * than folded into this one, where lowering the cutoff costs real chord tones
+ * (C2's third harmonic is G) more than it gains.
  */
 export const CHROMA_MIN_HZ = 110;
 export const CHROMA_MAX_HZ = 2000;
 
 export const FRAME_SIZE = 4096;
 export const HOP_SIZE = 2048;
+
+/**
+ * Bass band, and the frame length that resolves it.
+ *
+ * A semitone at 55 Hz is 3.27 Hz, so a frame must be at least ~1/3.27 s long for
+ * the Hann main lobe to fit inside one semitone; 16384 samples at 11 kHz is
+ * 1.49 s and 0.67 Hz bins. Long frames smear note *onsets* together, which is
+ * harmless here because the bass note is what matters, not when it was struck.
+ *
+ * The top of the band has to reach E3, not just E2. A bass line sits roughly an
+ * octave above the lowest note a listener would call "the bass", and a band that
+ * stops at 130 Hz cannot see a bass note at D3 (147 Hz) at all - it then latches
+ * onto an octave-below artifact of whatever else is sounding and names the wrong
+ * tonic.
+ */
+const BASS_MIN_HZ = 55;
+const BASS_MAX_HZ = 165;
+const BASS_FRAME_SIZE = 16384;
+const BASS_HOP_SIZE = 8192;
+
+/**
+ * How much harmonic support a low peak needs before it counts as a bass note.
+ *
+ * The bass band is also where a kick drum lives, and a kick is a fast downward
+ * pitch sweep: loud, tonal enough to survive the flatness gate, and covering
+ * every pitch class as it falls. What separates the two is harmonics - a bass
+ * *note* is a periodic wave with a 2f and 3f above it, a kick is a single
+ * decaying thump with none.
+ *
+ * Measured as the mean of the peak's 2f/3f/4f magnitudes over the fundamental's
+ * own magnitude. Dividing by the fundamental rather than by the band's median
+ * matters: the median of a wide band is dominated by whatever noise or drums
+ * fill it, so it collapses as the band grows and the gate stops working.
+ *
+ * A kick scores 0.10, a synthetic kick-only mix 0.10, while a real track's bass
+ * scores 0.25 and a clean bass tone 0.34. 0.18 sits in that gap.
+ */
+const BASS_HARMONIC_SUPPORT = 0.18;
 
 /** Fine bins per octave: 36 gives 33 cent resolution, enough for tuning. */
 export const FINE_BINS_PER_OCTAVE = 36;
@@ -147,10 +201,121 @@ export function analyzeChroma(
 
   return {
     chroma: chroma.map((value) => value / strongest),
+    bass: analyseBass(samples, sampleRate),
     tuningCents: wrapCents(offset * CENTS_PER_FINE_BIN),
     lowMidi: percentileMidi(midiHistogram, 0.05),
     highMidi: percentileMidi(midiHistogram, 0.95),
   };
+}
+
+/**
+ * Pitch-class weights of the lowest voice, from a pass long enough to resolve it.
+ *
+ * Every peak in the band that carries its own overtones contributes, weighted by
+ * magnitude. Summing all of them rather than only the strongest keeps a bass
+ * note that is quiet under a chord from disappearing, while the harmonic gate
+ * still throws out the kick. A bass note and its own overtones land on different
+ * pitch classes, but the gate only admits the fundamental of each peak, so the
+ * overtones do not vote twice.
+ *
+ * Returns all zeros when the recording has no bass content, which the key finder
+ * reads as "no evidence" rather than as "every note equally likely".
+ */
+function analyseBass(samples: Float32Array, sampleRate: number): number[] {
+  const bass = new Array<number>(12).fill(0);
+  if (samples.length < BASS_FRAME_SIZE) return bass;
+
+  const fft = new Fft(BASS_FRAME_SIZE);
+  const window = hannWindow(BASS_FRAME_SIZE);
+  const re = new Float32Array(BASS_FRAME_SIZE);
+  const im = new Float32Array(BASS_FRAME_SIZE);
+  const magnitude = new Float32Array(BASS_FRAME_SIZE / 2);
+  const binHz = sampleRate / BASS_FRAME_SIZE;
+  const lowestBin = Math.max(2, Math.ceil(BASS_MIN_HZ / binHz));
+  const highestBin = Math.min(BASS_FRAME_SIZE / 2 - 2, Math.floor(BASS_MAX_HZ / binHz));
+  // Overtones are checked up to 4x the band's top, so their bins must be
+  // populated too; only the search for the fundamental stays inside the band.
+  const supportHighestBin = Math.min(BASS_FRAME_SIZE / 2 - 2, highestBin * 4);
+  const frameCount = Math.floor((samples.length - BASS_FRAME_SIZE) / BASS_HOP_SIZE) + 1;
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const offset = frame * BASS_HOP_SIZE;
+    for (let i = 0; i < BASS_FRAME_SIZE; i += 1) {
+      re[i] = samples[offset + i] * window[i];
+      im[i] = 0;
+    }
+    fft.transform(re, im);
+
+    let peak = 0;
+    for (let bin = lowestBin; bin <= supportHighestBin; bin += 1) {
+      magnitude[bin] = Math.hypot(re[bin], im[bin]);
+      if (bin <= highestBin && magnitude[bin] > peak) peak = magnitude[bin];
+    }
+    if (!(peak > 0)) continue;
+    if (spectralFlatness(magnitude, lowestBin, highestBin) > MAX_FLATNESS) continue;
+
+    for (let bin = lowestBin + 1; bin < highestBin; bin += 1) {
+      const value = magnitude[bin];
+      if (value < peak * NOISE_FLOOR) continue;
+      if (value <= magnitude[bin - 1] || value < magnitude[bin + 1]) continue;
+
+      const fundamental = refinePeakBin(magnitude, bin) * binHz;
+      if (harmonicSupport(magnitude, bin, fundamental, binHz) < BASS_HARMONIC_SUPPORT) {
+        continue;
+      }
+
+      const midi = 69 + 12 * Math.log2(fundamental / 440);
+      const pc = ((Math.round(midi) % 12) + 12) % 12;
+      bass[pc] += Math.sqrt(value / peak);
+    }
+  }
+
+  const strongest = Math.max(...bass);
+  if (!(strongest > 0)) return bass;
+  return bass.map((value) => value / strongest);
+}
+
+/**
+ * How strongly a peak's 2f/3f/4f overtones stand above the fundamental itself.
+ *
+ * Relative to the fundamental, so the gate means the same thing whether the
+ * band is 60 Hz wide or 300. Capped per harmonic so one very loud overtone
+ * cannot carry an otherwise harmonic-free peak past the threshold.
+ */
+function harmonicSupport(
+  magnitude: Float32Array,
+  peakBin: number,
+  fundamental: number,
+  binHz: number,
+): number {
+  if (!(fundamental > 0)) return 0;
+
+  let support = 0;
+  let counted = 0;
+  for (let harmonic = 2; harmonic <= 4; harmonic += 1) {
+    const bin = Math.round((fundamental * harmonic) / binHz);
+    if (bin + 1 >= magnitude.length || bin <= 0) break;
+    const local = Math.max(magnitude[bin - 1], magnitude[bin], magnitude[bin + 1]);
+    support += Math.min(2, local / magnitude[peakBin]);
+    counted += 1;
+  }
+  return counted > 0 ? support / counted : 0;
+}
+
+/**
+ * Parabolic interpolation of a magnitude peak, in bins.
+ *
+ * On the log magnitude, which locates the peak to a fraction of a bin; without
+ * it the tuning estimate is quantized to the FFT grid and a detuned recording
+ * cannot be corrected.
+ */
+function refinePeakBin(magnitude: Float32Array, bin: number): number {
+  const previous = Math.log(magnitude[bin - 1] || 1e-12);
+  const here = Math.log(magnitude[bin] || 1e-12);
+  const next = Math.log(magnitude[bin + 1] || 1e-12);
+  const curvature = previous - 2 * here + next;
+  const shift = curvature !== 0 ? (0.5 * (previous - next)) / curvature : 0;
+  return bin + Math.max(-0.5, Math.min(0.5, shift));
 }
 
 /**
@@ -176,15 +341,7 @@ function findPeaks(
     if (value < floor) continue;
     if (value <= magnitude[bin - 1] || value < magnitude[bin + 1]) continue;
 
-    // Parabolic interpolation on the log magnitude locates the peak to a
-    // fraction of a bin; without it the tuning estimate is quantized to the
-    // 33-cent grid and a detuned recording cannot be corrected.
-    const previous = Math.log(magnitude[bin - 1] || 1e-12);
-    const here = Math.log(value);
-    const next = Math.log(magnitude[bin + 1] || 1e-12);
-    const curvature = previous - 2 * here + next;
-    const shift = curvature !== 0 ? (0.5 * (previous - next)) / curvature : 0;
-    const refinedBin = bin + Math.max(-0.5, Math.min(0.5, shift));
+    const refinedBin = refinePeakBin(magnitude, bin);
 
     peaks.push({
       midi: 69 + 12 * Math.log2((refinedBin * binHz) / 440),
