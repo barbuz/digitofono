@@ -1,4 +1,20 @@
 /**
+ * Parametric harmonic table. `tilt` is the rolloff exponent and `even` is the
+ * weight of the even partials: 0 gives an odd-only (hollow) spectrum, 1 gives
+ * every partial the same 1/n^tilt rolloff. This replaces the old hand-written
+ * amplitude arrays so every preset value maps to a slider.
+ */
+export function harmonicTable(tilt: number, even: number, count = 16): number[] {
+  const exponent = Math.max(0.1, tilt);
+  const evenWeight = Math.max(0, Math.min(1, even));
+  return Array.from({ length: count }, (_, index) => {
+    const n = index + 1;
+    const weight = n % 2 === 1 ? 1 : evenWeight;
+    return weight / Math.pow(n, exponent);
+  });
+}
+
+/**
  * Build a `PeriodicWave` from harmonic amplitudes.
  *
  * All partials are given phase 0 (sine phase). Because the oscillators that

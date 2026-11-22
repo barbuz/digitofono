@@ -1,89 +1,95 @@
-import type { Preset, PresetId } from '../state/schema';
+import { timbrePositionForHz } from '../mapping/shortAxis';
+import { DEFAULT_TONE, type Preset, type PresetId, type ToneState } from '../state/schema';
 
 /**
- * Harmonic amplitude arrays with rolled-off partials. Combined with the
- * always-on lowpass filter these give warm, glassy tones rather than the
- * buzzy edge of a raw saw or square.
+ * Presets are snapshots of the tone sliders, not runtime modes. Selecting one
+ * copies its values into the settings; editing any slider then makes the
+ * current state "custom".
  */
-function rolloff(count: number, exponent: number): number[] {
-  return Array.from({ length: count }, (_, i) => 1 / Math.pow(i + 1, exponent));
-}
-
-/** Odd-partial dominant, hollow (clarinet-ish). */
-function oddOnly(count: number, exponent: number): number[] {
-  return Array.from({ length: count }, (_, i) =>
-    (i + 1) % 2 === 1 ? 1 / Math.pow(i + 1, exponent) : 0,
-  );
+function values(patch: Partial<ToneState>): ToneState {
+  return { ...DEFAULT_TONE, ...patch };
 }
 
 export const PRESETS: Record<PresetId, Preset> = {
   warm: {
     id: 'warm',
     name: 'Warm',
-    attack: 0.015,
-    decay: 0.25,
-    sustain: 0.85,
-    release: 0.2,
-    filterDefaultHz: 2500,
-    filterQ: 0.9,
-    morphDefault: 0.35,
-    waveDark: oddOnly(16, 1.4),
-    waveBright: rolloff(16, 1.2),
+    values: { ...DEFAULT_TONE },
   },
   hollow: {
     id: 'hollow',
     name: 'Hollow',
-    attack: 0.02,
-    decay: 0.3,
-    sustain: 0.8,
-    release: 0.25,
-    filterDefaultHz: 1800,
-    filterQ: 1.1,
-    morphDefault: 0.2,
-    waveDark: oddOnly(16, 1.1),
-    waveBright: oddOnly(16, 1.6),
+    values: values({
+      timbre: timbrePositionForHz(1800),
+      morph: 0.2,
+      filterQ: 1.1,
+      attack: 0.02,
+      decay: 0.3,
+      sustain: 0.8,
+      release: 0.25,
+      darkTilt: 1.1,
+      darkEven: 0,
+      brightTilt: 1.6,
+      brightEven: 0,
+    }),
   },
   bell: {
     id: 'bell',
     name: 'Bell',
-    attack: 0.005,
-    decay: 0.9,
-    sustain: 0.35,
-    release: 0.6,
-    filterDefaultHz: 5000,
-    filterQ: 0.7,
-    morphDefault: 0.6,
-    waveDark: rolloff(16, 1.6),
-    waveBright: [
-      1, 0.0, 0.5, 0.0, 0.28, 0.0, 0.18, 0.0, 0.12, 0.0, 0.08, 0.0, 0.06, 0.0, 0.04, 0.0,
-    ],
+    values: values({
+      timbre: timbrePositionForHz(5000),
+      morph: 0.6,
+      filterQ: 0.7,
+      attack: 0.005,
+      decay: 0.9,
+      sustain: 0.35,
+      release: 0.6,
+      darkTilt: 1.6,
+      darkEven: 1,
+      // The old bell table was odd-only with a slow rolloff; this is the
+      // closest point in the parametric family.
+      brightTilt: 0.9,
+      brightEven: 0,
+    }),
   },
   pad: {
     id: 'pad',
     name: 'Pad',
-    attack: 0.35,
-    decay: 0.5,
-    sustain: 0.8,
-    release: 0.9,
-    filterDefaultHz: 1600,
-    filterQ: 0.8,
-    morphDefault: 0.4,
-    waveDark: oddOnly(16, 1.3),
-    waveBright: rolloff(16, 1.5),
+    values: values({
+      timbre: timbrePositionForHz(1600),
+      morph: 0.4,
+      filterQ: 0.8,
+      attack: 0.35,
+      decay: 0.5,
+      sustain: 0.8,
+      release: 0.9,
+      darkTilt: 1.3,
+      darkEven: 0,
+      brightTilt: 1.5,
+      brightEven: 1,
+    }),
   },
   pluck: {
     id: 'pluck',
     name: 'Pluck',
-    attack: 0.006,
-    decay: 0.4,
-    sustain: 0.0,
-    release: 0.25,
-    filterDefaultHz: 3200,
-    filterQ: 1.0,
-    morphDefault: 0.5,
-    waveDark: rolloff(16, 1.8),
-    waveBright: rolloff(16, 1.1),
+    values: values({
+      timbre: timbrePositionForHz(3200),
+      morph: 0.5,
+      filterQ: 1.0,
+      attack: 0.006,
+      decay: 0.4,
+      sustain: 0,
+      release: 0.25,
+      darkTilt: 1.8,
+      darkEven: 1,
+      brightTilt: 1.1,
+      brightEven: 1,
+    }),
   },
 };
 
 export const PRESET_IDS = Object.keys(PRESETS) as PresetId[];
+
+export function isPresetId(id: unknown): id is PresetId {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(PRESETS, id);
+}

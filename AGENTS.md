@@ -48,8 +48,9 @@ verified on a real device.
   defaults to existing devices, bump `SETTINGS_VERSION` (the storage key derives
   from it, so a bump starts a clean key). `settings.test.ts` pins this and fails
   if the version is not bumped.
-- The harmonizer (`mapping/harmony.ts`) is a *short-axis option*, not a separate
-  mode: at `shortPos = 0` it sounds the bare note, and every harmony note starts
+- The harmonizer (`mapping/harmony.ts`) is both a *short-axis option* and a stored
+  tone value, not a separate mode: at `shortPos = 0` on the axis it sounds the
+  bare note, and every harmony note starts
   fading in as soon as the axis advances, each at a rate set by its absolute
   semitone distance from the root, up to the full four-note chord (root + major
   third, fifth and seventh). The nearest note is full at `HARMONY_FULL_AT`
@@ -62,8 +63,33 @@ verified on a real device.
   class is in scale and the snapping never fires. Each harmony note is its own
   dark/bright oscillator pair on the same voice; because `OscillatorNode` is
   single-use, all pairs are built at onset (even the silent ones) and faded in
-  via a per-note gain, never started later. When the harmony axis is not selected,
-  `Player` passes empty ratios and the voice keeps its original two oscillators.
+  via a per-note gain, never started later. When the harmony axis is not selected
+  and the fixed harmony amount is zero, `Player` passes empty ratios and the voice
+  keeps its original two oscillators; a positive fixed amount builds the chord
+  graph off-axis.
+- Presets are snapshots, not runtime modes. Every value a preset controls lives in
+  `Settings` as part of `ToneState`; `PRESETS` only supplies values to copy.
+  Selecting a preset calls `applyPreset`, which copies the values and sets `preset`
+  to the id. Editing any tone slider calls `updateTone`, which sets
+  `preset: 'custom'`. `resolveAxes`, `Voice` and `AudioEngine` must never read
+  `settings.preset` to derive sound; the preset field is a UI label only.
+- The wave tables are parametric: `harmonicTable(tilt, even)` in `waves.ts`.
+  `even = 0` is odd-only/hollow, `even = 1` keeps every partial with the same
+  `1/n^tilt` rolloff. This replaced the hand-written amplitude arrays so every
+  preset value maps to a slider. Presets were re-voiced to the nearest point in
+  that family; the bell table is the only approximation.
+- User presets live in `state/userPresets.ts` under
+  `digitofono.userPresets.v1`, separate from the settings blob. They store a
+  `ToneState` snapshot, never the short-axis assignment or global settings. Saving
+  a name that already exists updates that preset instead of duplicating it.
+- A v2 settings blob from before this overhaul has only `preset`. `load()` must
+  hydrate the tone fields from that preset (`PRESETS[parsed.preset].values`) before
+  applying `...parsed`, or a saved Bell silently loads warm's cutoff and morph.
+- The harmony graph is built whenever the harmony axis is selected, even at
+  `shortPos = 0` where every level is silent, so it can fade in as the finger
+  moves. It is also built off-axis when a fixed harmony amount is > 0. Checking
+  only "any level > 0" drops the axis-at-zero case and the chord can never fade
+  in.
 - Adding a *new* field to `Settings` does not need a `SETTINGS_VERSION` bump: the
   store merges `{ ...DEFAULT_SETTINGS, ...stored }`, so an older blob simply picks
   up the new default. Bump the version only when an *existing* default changes and

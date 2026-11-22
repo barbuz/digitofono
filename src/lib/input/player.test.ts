@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Player, TAP_MS, type SurfaceGeometry } from './player';
 import type { AudioEngine } from '../audio/AudioEngine';
-import type { Settings } from '../state/schema';
+import { DEFAULT_SETTINGS, type Settings } from '../state/schema';
 
 /**
  * Exercises the Player's touch bookkeeping - the layer where the "every second
@@ -67,7 +67,7 @@ class RecordingEngine {
     return {};
   }
 
-  setPreset(): void {}
+  setWaveShape(): void {}
   setMasterVolume(): void {}
   setReverbAmount(): void {}
   setEnsemble(): void {}
@@ -75,20 +75,11 @@ class RecordingEngine {
 }
 
 const settings: Settings = {
-  version: 2,
-  baseMidi: 48,
-  octaveSpan: 3,
-  scale: 'chromatic',
+  ...DEFAULT_SETTINGS,
   snapStrength: 0.6,
   shortAxis: 'timbre',
-  harmonyVoicing: 'diatonic',
-  volume: 0.8,
-  reverbAmount: 0.12,
   ensemble: 0.3,
-  vibrato: 0.2,
   scaleLines: 0,
-  listen: false,
-  preset: 'warm',
 };
 
 const geometry: SurfaceGeometry = {
@@ -177,12 +168,30 @@ describe('Player harmony wiring', () => {
     expect(ratios[2]).toBeGreaterThan(ratios[1]);
   });
 
-  it('passes no ratios when another axis is selected', () => {
-    const { engine, player } = makeHarmonyPlayer({ shortAxis: 'timbre' });
+  it('passes no ratios when another axis is selected and harmony is off', () => {
+    const { engine, player } = makeHarmonyPlayer({ shortAxis: 'timbre', harmony: 0 });
 
     player.pointerDown(1, 200, 400);
 
     expect(engine.voices[0].lastParams!.harmonyRatios).toEqual([]);
+  });
+
+  it('builds ratios on the harmony axis even at position 0', () => {
+    const { engine, player } = makeHarmonyPlayer();
+
+    player.pointerDown(1, 0, 400);
+
+    expect(engine.voices[0].lastParams!.harmonyRatios).toHaveLength(3);
+    expect(engine.voices[0].lastParams!.harmonyLevels).toEqual([0, 0, 0]);
+  });
+
+  it('passes ratios when a fixed harmony amount is set off-axis', () => {
+    const { engine, player } = makeHarmonyPlayer({ shortAxis: 'timbre', harmony: 0.5 });
+
+    player.pointerDown(1, 200, 400);
+
+    expect(engine.voices[0].lastParams!.harmonyRatios).toHaveLength(3);
+    expect(engine.voices[0].lastParams!.harmonyLevels.some((level) => level > 0)).toBe(true);
   });
 
   it('uses the fixed major voicing regardless of the scale', () => {

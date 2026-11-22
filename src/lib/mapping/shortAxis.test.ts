@@ -3,6 +3,8 @@ import {
   shortAxisToCutoff,
   shortAxisToMorph,
   shortAxisToGain,
+  timbreHzForPosition,
+  timbrePositionForHz,
   trackCutoffForPitch,
 } from './shortAxis';
 
@@ -61,5 +63,18 @@ describe('trackCutoffForPitch', () => {
 
   it('raises the cutoff for higher notes', () => {
     expect(trackCutoffForPitch(2500, 523.26)).toBeGreaterThan(2500);
+  });
+});
+
+describe('timbrePositionForHz', () => {
+  it('round-trips through the cutoff curve', () => {
+    for (const hz of [300, 800, 2500, 5000, 8000]) {
+      expect(timbreHzForPosition(timbrePositionForHz(hz))).toBeCloseTo(hz, 6);
+    }
+  });
+
+  it('clamps to the sweep bounds', () => {
+    expect(timbrePositionForHz(100)).toBe(0);
+    expect(timbrePositionForHz(20000)).toBe(1);
   });
 });
