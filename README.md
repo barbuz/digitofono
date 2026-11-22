@@ -15,8 +15,9 @@ The design goals and full specification live in [SPEC.md](./SPEC.md).
 - **Multi-touch** plays several notes at once.
 - Turn on **Scale lines** in the settings to draw a faint guide line at every
   step of the current scale.
-- Open the gear icon for presets, scales, snap strength, and the short-axis
-  assignment.
+- Open the gear icon for presets, tone and envelope sliders, the short-axis
+  assignment, scales, and snap strength. Edit any tone slider to make the sound
+  "Custom", then save it as a named preset on the device.
 
 ## Development
 

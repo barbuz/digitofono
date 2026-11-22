@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRESETS } from '../audio/presets';
 
 /**
  * The store reads localStorage at module load, so each case installs a stub and
@@ -29,6 +30,7 @@ describe('settings persistence', () => {
     installStorage({});
     const { getSettings } = await loadStore();
     expect(getSettings().ensemble).toBe(0.75);
+    expect(getSettings().preset).toBe('warm');
   });
 
   it('discards settings saved by an older version', async () => {
@@ -73,5 +75,55 @@ describe('settings persistence', () => {
     expect(getSettings().harmonyVoicing).toBe('diatonic');
     // `listen` is likewise additive and must default to off for an old blob.
     expect(getSettings().listen).toBe(false);
+  });
+
+  it('hydrates tone values from the saved preset for an older blob', async () => {
+    // A blob from before tone values moved into settings. It only knows the
+    // preset id, so the new fields must come from that preset, not from warm.
+    installStorage({
+      'digitofono.settings.v2': JSON.stringify({ version: 2, preset: 'bell' }),
+    });
+
+    const { getSettings } = await loadStore();
+    expect(getSettings().preset).toBe('bell');
+    expect(getSettings().timbre).toBeCloseTo(PRESETS.bell.values.timbre, 9);
+    expect(getSettings().attack).toBeCloseTo(PRESETS.bell.values.attack, 9);
+    expect(getSettings().brightEven).toBe(PRESETS.bell.values.brightEven);
+  });
+});
+
+describe('preset selection', () => {
+  beforeEach(() => vi.resetModules());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('applies every tone value from a preset', async () => {
+    installStorage({});
+    const { applyPreset, getSettings } = await loadStore();
+
+    applyPreset(PRESETS.pad);
+    const current = getSettings();
+    expect(current.preset).toBe('pad');
+    expect(current.timbre).toBeCloseTo(PRESETS.pad.values.timbre, 9);
+    expect(current.morph).toBeCloseTo(PRESETS.pad.values.morph, 9);
+    expect(current.attack).toBeCloseTo(PRESETS.pad.values.attack, 9);
+    expect(current.darkTilt).toBeCloseTo(PRESETS.pad.values.darkTilt, 9);
+  });
+
+  it('marks the preset custom when a tone value is edited', async () => {
+    installStorage({});
+    const { updateTone, getSettings } = await loadStore();
+
+    updateTone({ morph: 0.91 });
+    expect(getSettings().preset).toBe('custom');
+    expect(getSettings().morph).toBeCloseTo(0.91, 9);
+  });
+
+  it('does not mark the preset custom for a non-tone setting', async () => {
+    installStorage({});
+    const { updateSettings, getSettings } = await loadStore();
+
+    updateSettings({ reverbAmount: 0.5 });
+    expect(getSettings().preset).toBe('warm');
+    expect(getSettings().reverbAmount).toBe(0.5);
   });
 });

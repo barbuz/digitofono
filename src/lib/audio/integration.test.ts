@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AudioEngine, MAX_VOICES } from './AudioEngine';
 import { Player, TAP_MS } from '../input/player';
 import { FakeAudioContext } from './fakeAudio';
-import { PRESETS } from './presets';
-import type { Settings } from '../state/schema';
+import { DEFAULT_SETTINGS, type Settings } from '../state/schema';
 
 /**
  * End-to-end check of the press/release path with the real AudioEngine, the
@@ -14,20 +13,11 @@ import type { Settings } from '../state/schema';
  */
 
 const settings: Settings = {
-  version: 2,
-  baseMidi: 48,
-  octaveSpan: 3,
-  scale: 'chromatic',
+  ...DEFAULT_SETTINGS,
   snapStrength: 0.6,
   shortAxis: 'timbre',
-  harmonyVoicing: 'diatonic',
-  volume: 0.8,
-  reverbAmount: 0.12,
   ensemble: 0.3,
-  vibrato: 0.2,
   scaleLines: 0,
-  listen: false,
-  preset: 'warm',
 };
 
 function makePlayer() {
@@ -137,10 +127,14 @@ describe('Player + AudioEngine integration', () => {
     expect((engine as unknown as { pool: unknown[] }).pool.length).toBe(MAX_VOICES);
   });
 
-  it('uses the selected preset for its wave tables', () => {
+  it('rebuilds the wave tables when the tone shape changes', async () => {
     const { engine } = makePlayer();
-    engine.setPreset(PRESETS.bell);
-    expect(engine.currentPreset).toBe(PRESETS.bell);
+    await engine.ensureRunning();
+
+    const before = engine.currentWaveDark;
+    engine.setWaveShape({ darkTilt: 2.5, darkEven: 0, brightTilt: 0.5, brightEven: 1 });
+
+    expect(engine.currentWaveDark).not.toBe(before);
   });
 });
 
@@ -163,6 +157,35 @@ describe('Player harmony integration', () => {
     // Prime the engine so its own LFOs exist before the baseline is taken, then
     // count only what the note adds: four notes (root + third + fifth +
     // seventh), two oscillators each.
+    await engine.ensureRunning();
+    const before = ctx.oscillators.length;
+    player.pointerDown(1, 200, 400);
+
+    expect(ctx.oscillators.length - before).toBe(8);
+  });
+
+  it('builds the silent harmony graph at axis position 0 so it can fade in', async () => {
+    const { ctx, engine, player } = makeHarmonyPlayer('chromatic', 'diatonic');
+
+    await engine.ensureRunning();
+    const before = ctx.oscillators.length;
+    player.pointerDown(1, 0, 400);
+
+    // Root plus three harmony notes, two oscillators each, even though every
+    // harmony level is 0 at this position.
+    expect(ctx.oscillators.length - before).toBe(8);
+  });
+
+  it('builds a chord when the harmony amount is fixed, not the axis', async () => {
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine(() => ctx as unknown as AudioContext);
+    const player = new Player(
+      { ...settings, shortAxis: 'timbre', harmony: 1 },
+      { longLength: 800, shortLength: 400, longIsVertical: true },
+      {},
+      engine,
+    );
+
     await engine.ensureRunning();
     const before = ctx.oscillators.length;
     player.pointerDown(1, 200, 400);

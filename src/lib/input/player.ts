@@ -1,7 +1,6 @@
 import { AudioEngine } from '../audio/AudioEngine';
 import { Voice } from '../audio/Voice';
 import { resolveAxes } from '../audio/params';
-import { PRESETS } from '../audio/presets';
 import { positionToSnappedMidi, midiToFrequency, midiToNoteName } from '../mapping/pitch';
 import { harmonyMidiValues } from '../mapping/harmony';
 import { trackCutoffForPitch } from '../mapping/shortAxis';
@@ -97,8 +96,7 @@ export class Player {
   }
 
   private applySettings(settings: Settings): void {
-    const preset = PRESETS[settings.preset];
-    this.engine.setPreset(preset);
+    this.engine.setWaveShape(settings);
     this.engine.setMasterVolume(settings.volume);
     this.engine.setReverbAmount(settings.reverbAmount);
     this.engine.setEnsemble(settings.ensemble);
@@ -133,12 +131,16 @@ export class Player {
   }
 
   /**
-   * Frequency ratios of the harmony notes above the root at `pitchPos`. Only
-   * built while the harmony axis is selected, so the other axes keep the plain
-   * two-oscillator voice.
+   * Frequency ratios of the harmony notes above the root at `pitchPos`. Built
+   * whenever any harmony level is positive, so a fixed harmony amount works
+   * even when the short axis is something else.
    */
-  private harmonyRatiosFor(pitchPos: number): number[] {
-    if (this.settings.shortAxis !== 'harmony') return [];
+  private harmonyRatiosFor(pitchPos: number, levels: number[]): number[] {
+    // On the harmony axis the levels start at 0 at shortPos 0 but can rise as
+    // the finger moves, so the graph must be built even when the initial levels
+    // are silent. A fixed amount below the axis only needs the graph when it is
+    // actually audible.
+    if (this.settings.shortAxis !== 'harmony' && !levels.some((level) => level > 0)) return [];
     const rootMidi = this.midiFor(pitchPos);
     const rootHz = midiToFrequency(rootMidi);
     return harmonyMidiValues(rootMidi, this.activeScale, this.settings.harmonyVoicing).map(
@@ -154,8 +156,7 @@ export class Player {
     this.engine.ensureRunning().catch(() => {});
 
     const { pitchPos, shortPos } = this.toAxes(x, y);
-    const preset = PRESETS[this.settings.preset];
-    const axes = resolveAxes(this.settings, preset, shortPos);
+    const axes = resolveAxes(this.settings, shortPos);
     const frequency = this.frequencyFor(pitchPos);
 
     const voice = this.engine.allocate();
@@ -169,14 +170,20 @@ export class Player {
     }
 
     voice.start({
-      preset,
+      envelope: {
+        attack: this.settings.attack,
+        decay: this.settings.decay,
+        sustain: this.settings.sustain,
+        release: this.settings.release,
+      },
+      filterQ: this.settings.filterQ,
       waveDark: this.engine.currentWaveDark,
       waveBright: this.engine.currentWaveBright,
       frequency,
       morph: axes.morph,
       cutoffHz: trackCutoffForPitch(axes.cutoffHz, frequency),
       level: axes.level,
-      harmonyRatios: this.harmonyRatiosFor(pitchPos),
+      harmonyRatios: this.harmonyRatiosFor(pitchPos, axes.harmony),
       harmonyLevels: axes.harmony,
     });
 
@@ -199,13 +206,12 @@ export class Player {
     if (!state || state.released) return;
 
     const { pitchPos, shortPos } = this.toAxes(x, y);
-    const preset = PRESETS[this.settings.preset];
-    const axes = resolveAxes(this.settings, preset, shortPos);
+    const axes = resolveAxes(this.settings, shortPos);
     const frequency = this.frequencyFor(pitchPos);
 
     state.voice.glideFrequency(frequency);
     state.voice.setMorph(axes.morph);
-    state.voice.setHarmony(this.harmonyRatiosFor(pitchPos), axes.harmony);
+    state.voice.setHarmony(this.harmonyRatiosFor(pitchPos, axes.harmony), axes.harmony);
     state.voice.setCutoff(trackCutoffForPitch(axes.cutoffHz, frequency));
     state.voice.setLevel(axes.level);
 

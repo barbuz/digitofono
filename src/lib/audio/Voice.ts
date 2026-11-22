@@ -1,4 +1,4 @@
-import type { Preset } from '../state/schema';
+import type { Envelope } from '../state/schema';
 
 const GLIDE_TAU = 0.012;
 const MIN_ATTACK = 0.008;
@@ -6,7 +6,8 @@ const EPS = 0.0001;
 const STOP_PADDING = 0.03;
 
 export interface VoiceParams {
-  preset: Preset;
+  envelope: Envelope;
+  filterQ: number;
   waveDark: PeriodicWave;
   waveBright: PeriodicWave;
   frequency: number;
@@ -17,8 +18,8 @@ export interface VoiceParams {
    * Frequency ratio of each harmony note to the root, in ascending order. The
    * `octaves` voicing puts its first ratio below 1 (an octave under the root),
    * so a ratio is not necessarily greater than 1.
-   * Empty when the harmonizer is off, in which case only the root is built -
-   * so the two-oscillator graph is preserved for the non-harmony axes.
+   * Empty when the harmony amount is zero, in which case only the root is
+   * built and the voice keeps its plain two-oscillator graph.
    */
   harmonyRatios: number[];
   /** Initial level of each harmony note, parallel to `harmonyRatios`. */
@@ -68,7 +69,7 @@ export class Voice {
   private level: GainNode | null = null;
   private filter: BiquadFilterNode | null = null;
   private panner: StereoPannerNode | null = null;
-  private preset: Preset | null = null;
+  private envelope: Envelope | null = null;
   /** The root note's current frequency, so harmony notes can be retuned to it. */
   private rootFrequency = 0;
 
@@ -104,7 +105,7 @@ export class Voice {
     const panner = this.ctx.createStereoPanner();
 
     filter.type = 'lowpass';
-    filter.Q.value = params.preset.filterQ;
+    filter.Q.value = params.filterQ;
     filter.frequency.setValueAtTime(clampCutoff(this.ctx, params.cutoffHz), now);
 
     env.gain.setValueAtTime(0, now);
@@ -124,11 +125,11 @@ export class Voice {
       this.notes.push(this.buildNote(params, ratio, noteLevel, params.morph, now));
     }
 
-    const attack = Math.max(MIN_ATTACK, params.preset.attack);
+    const attack = Math.max(MIN_ATTACK, params.envelope.attack);
     env.gain.linearRampToValueAtTime(1, now + attack);
     env.gain.linearRampToValueAtTime(
-      Math.max(EPS, params.preset.sustain),
-      now + attack + params.preset.decay,
+      Math.max(EPS, params.envelope.sustain),
+      now + attack + params.envelope.decay,
     );
 
     for (const note of this.notes) {
@@ -139,7 +140,7 @@ export class Voice {
     this.level = level;
     this.filter = filter;
     this.panner = panner;
-    this.preset = params.preset;
+    this.envelope = params.envelope;
     this.playing = true;
     this.releasing = false;
     this.freeAt = Number.POSITIVE_INFINITY;
@@ -243,12 +244,12 @@ export class Voice {
    */
   release(asPluck: boolean): void {
     if (!this.playing || this.releasing) return;
-    if (!this.env || this.notes.length === 0 || !this.preset) return;
+    if (!this.env || this.notes.length === 0 || !this.envelope) return;
 
     const now = this.ctx.currentTime;
     const releaseTime = asPluck
-      ? Math.max(this.preset.decay, 0.25)
-      : Math.max(0.05, this.preset.release);
+      ? Math.max(this.envelope.decay, 0.25)
+      : Math.max(0.05, this.envelope.release);
 
     this.env.gain.cancelScheduledValues(now);
     this.env.gain.setValueAtTime(Math.max(EPS, this.env.gain.value), now);

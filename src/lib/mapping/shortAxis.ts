@@ -11,17 +11,37 @@ export const SHORT_AXIS_LABELS: Record<ShortAxisId, string> = {
   volume: 'Volume',
 };
 
+/** Cutoff sweep bounds for the timbre short axis. */
+export const TIMBRE_MIN_HZ = 300;
+export const TIMBRE_MAX_HZ = 8000;
+
 export interface TimbreMapping {
   minHz: number;
   maxHz: number;
 }
 
+export const TIMBRE_MAPPING: TimbreMapping = {
+  minHz: TIMBRE_MIN_HZ,
+  maxHz: TIMBRE_MAX_HZ,
+};
+
 /**
  * Exponential cutoff sweep so the short axis feels even across its travel.
  */
-export function shortAxisToCutoff(pos: number, mapping: TimbreMapping): number {
+export function shortAxisToCutoff(pos: number, mapping: TimbreMapping = TIMBRE_MAPPING): number {
   const t = clamp01(pos);
   return mapping.minHz * Math.pow(mapping.maxHz / mapping.minHz, t);
+}
+
+/** Inverse of `shortAxisToCutoff`, clamped to the sweep bounds. */
+export function timbrePositionForHz(hz: number, mapping: TimbreMapping = TIMBRE_MAPPING): number {
+  const clamped = Math.max(mapping.minHz, Math.min(mapping.maxHz, hz));
+  return Math.log(clamped / mapping.minHz) / Math.log(mapping.maxHz / mapping.minHz);
+}
+
+/** Cutoff in Hz for a normalized timbre position. */
+export function timbreHzForPosition(pos: number, mapping: TimbreMapping = TIMBRE_MAPPING): number {
+  return shortAxisToCutoff(pos, mapping);
 }
 
 /**

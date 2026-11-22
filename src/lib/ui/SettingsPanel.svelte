@@ -1,18 +1,28 @@
 <script lang="ts">
-  import { PRESETS, PRESET_IDS } from '../audio/presets';
+  import { isPresetId, PRESETS, PRESET_IDS } from '../audio/presets';
   import { SCALE_IDS, SCALE_LABELS } from '../mapping/scales';
-  import { SHORT_AXIS_IDS, SHORT_AXIS_LABELS } from '../mapping/shortAxis';
   import { HARMONY_VOICING_IDS, HARMONY_VOICING_LABELS } from '../mapping/harmony';
   import { NOTE_NAMES, midiToNoteName } from '../mapping/pitch';
-  import { updateSettings, resetSettings } from '../state/settings';
+  import { timbreHzForPosition } from '../mapping/shortAxis';
+  import {
+    applyPreset,
+    resetSettings,
+    toneValues,
+    updateSettings,
+    updateTone,
+  } from '../state/settings';
+  import {
+    deleteUserPreset,
+    isUserPresetId,
+    saveUserPreset,
+    userPresets,
+  } from '../state/userPresets';
   import { clearSongScale, setSongScale } from '../state/songScale';
   import { SongAnalyser } from '../input/songFile';
   import { BUILD_INFO, formatBuildLabel } from '../version';
-  import type { Settings } from '../state/schema';
+  import type { Settings, ToneState } from '../state/schema';
   import type { ScaleId } from '../mapping/scales';
-  import type { ShortAxisId } from '../mapping/shortAxis';
   import type { HarmonyVoicing } from '../mapping/harmony';
-  import type { PresetId } from '../state/schema';
   import type { SongScale } from '../mapping/songScale';
 
   let {
@@ -29,6 +39,71 @@
   let analysing = $state(false);
   let progress = $state(0);
   let songError: string | null = $state(null);
+  let presetName = $state('');
+  let saveStatus: string | null = $state(null);
+
+  const selectedPresetId = $derived(
+    settings.preset === 'custom' ||
+      (!isPresetId(settings.preset) &&
+        !$userPresets.some((preset) => preset.id === settings.preset))
+      ? 'custom'
+      : settings.preset,
+  );
+
+  const ATTACK_MIN = 0.005;
+  const ATTACK_MAX = 1;
+  const DECAY_MIN = 0.02;
+  const DECAY_MAX = 2;
+  const RELEASE_MIN = 0.02;
+  const RELEASE_MAX = 3;
+
+  function timeToPos(value: number, min: number, max: number): number {
+    const clamped = Math.max(min, Math.min(max, value));
+    return Math.log(clamped / min) / Math.log(max / min);
+  }
+
+  function posToTime(pos: number, min: number, max: number): number {
+    return min * Math.pow(max / min, Math.max(0, Math.min(1, pos)));
+  }
+
+  function setTone(field: keyof ToneState, value: number): void {
+    updateTone({ [field]: value } as Partial<ToneState>);
+    saveStatus = null;
+  }
+
+  function onPresetChange(event: Event): void {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    if (value === 'custom') return;
+
+    if (isPresetId(value)) {
+      applyPreset(PRESETS[value]);
+      saveStatus = null;
+      return;
+    }
+
+    const saved = $userPresets.find((preset) => preset.id === value);
+    if (saved) {
+      applyPreset(saved);
+      saveStatus = null;
+    }
+  }
+
+  function saveCurrentPreset(): void {
+    const name = presetName.trim();
+    if (!name) return;
+    const saved = saveUserPreset(name, toneValues(settings));
+    updateSettings({ preset: saved.id });
+    presetName = '';
+    saveStatus = `Saved “${saved.name}”`;
+  }
+
+  function deleteCurrentPreset(): void {
+    if (!isUserPresetId(settings.preset)) return;
+    const name = $userPresets.find((preset) => preset.id === settings.preset)?.name ?? 'Preset';
+    deleteUserPreset(settings.preset);
+    updateSettings({ preset: 'custom' });
+    saveStatus = `Deleted “${name}”`;
+  }
 
   async function onSongFile(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
@@ -76,7 +151,9 @@
     })),
   ).flat();
 
-  function handleNumber(field: 'baseMidi' | 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'ensemble' | 'vibrato' | 'scaleLines') {
+  function handleNumber(
+    field: 'octaveSpan' | 'snapStrength' | 'volume' | 'reverbAmount' | 'ensemble' | 'vibrato' | 'scaleLines',
+  ) {
     return (event: Event) => {
       const value = Number((event.currentTarget as HTMLInputElement).value);
       updateSettings({ [field]: value });
@@ -108,30 +185,126 @@
 
     <label>
       Preset
-      <select
-        value={settings.preset}
-        onchange={(e) => updateSettings({ preset: (e.currentTarget.value as PresetId) })}
-      >
+      <select value={selectedPresetId} onchange={onPresetChange}>
         {#each PRESET_IDS as id}
           <option value={id}>{PRESETS[id].name}</option>
         {/each}
-      </select>
-    </label>
-
-    <label>
-      Short axis
-      <select
-        value={settings.shortAxis}
-        onchange={(e) =>
-          updateSettings({ shortAxis: (e.currentTarget.value as ShortAxisId) })}
-      >
-        {#each SHORT_AXIS_IDS as id}
-          <option value={id}>{SHORT_AXIS_LABELS[id]}</option>
+        {#each $userPresets as preset}
+          <option value={preset.id}>{preset.name}</option>
         {/each}
+        {#if selectedPresetId === 'custom'}
+          <option value="custom" disabled>Custom</option>
+        {/if}
       </select>
     </label>
 
-    {#if settings.shortAxis === 'harmony'}
+    {#if selectedPresetId === 'custom'}
+      <div class="save-preset">
+        <input
+          bind:value={presetName}
+          placeholder="Preset name"
+          maxlength="40"
+          aria-label="Preset name"
+        />
+        <button onclick={saveCurrentPreset} disabled={!presetName.trim()}>Save preset</button>
+      </div>
+    {/if}
+
+    {#if isUserPresetId(settings.preset)}
+      <button class="delete-preset" onclick={deleteCurrentPreset}>Delete this preset</button>
+    {/if}
+
+    {#if saveStatus}
+      <span class="hint">{saveStatus}</span>
+    {/if}
+
+    <h3>Tone</h3>
+
+    <div class="tone-row" class:active={settings.shortAxis === 'timbre'}>
+      <div class="tone-head">
+        <span>Timbre (brightness)</span>
+        <label class="axis-pick">
+          <input
+            type="radio"
+            name="shortAxis"
+            value="timbre"
+            checked={settings.shortAxis === 'timbre'}
+            onchange={() => updateSettings({ shortAxis: 'timbre' })}
+          />
+          Axis
+        </label>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.005"
+        value={settings.timbre}
+        disabled={settings.shortAxis === 'timbre'}
+        oninput={(e) => setTone('timbre', Number(e.currentTarget.value))}
+      />
+      <span class="hint">
+        {Math.round(timbreHzForPosition(settings.timbre))} Hz
+        {#if settings.shortAxis === 'timbre'} · touch controls this{/if}
+      </span>
+    </div>
+
+    <div class="tone-row" class:active={settings.shortAxis === 'harmonicMorph'}>
+      <div class="tone-head">
+        <span>Harmonic morph</span>
+        <label class="axis-pick">
+          <input
+            type="radio"
+            name="shortAxis"
+            value="harmonicMorph"
+            checked={settings.shortAxis === 'harmonicMorph'}
+            onchange={() => updateSettings({ shortAxis: 'harmonicMorph' })}
+          />
+          Axis
+        </label>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={settings.morph}
+        disabled={settings.shortAxis === 'harmonicMorph'}
+        oninput={(e) => setTone('morph', Number(e.currentTarget.value))}
+      />
+      <span class="hint">
+        {Math.round(settings.morph * 100)}% bright
+        {#if settings.shortAxis === 'harmonicMorph'} · touch controls this{/if}
+      </span>
+    </div>
+
+    <div class="tone-row" class:active={settings.shortAxis === 'harmony'}>
+      <div class="tone-head">
+        <span>Harmony</span>
+        <label class="axis-pick">
+          <input
+            type="radio"
+            name="shortAxis"
+            value="harmony"
+            checked={settings.shortAxis === 'harmony'}
+            onchange={() => updateSettings({ shortAxis: 'harmony' })}
+          />
+          Axis
+        </label>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={settings.harmony}
+        disabled={settings.shortAxis === 'harmony'}
+        oninput={(e) => setTone('harmony', Number(e.currentTarget.value))}
+      />
+      <span class="hint">
+        {settings.harmony === 0 ? 'off' : `${Math.round(settings.harmony * 100)}% chord`}
+        {#if settings.shortAxis === 'harmony'} · touch controls this{/if}
+      </span>
       <label>
         Harmony voicing
         <select
@@ -144,7 +317,153 @@
           {/each}
         </select>
       </label>
-    {/if}
+    </div>
+
+    <div class="tone-row" class:active={settings.shortAxis === 'volume'}>
+      <div class="tone-head">
+        <span>Touch volume</span>
+        <label class="axis-pick">
+          <input
+            type="radio"
+            name="shortAxis"
+            value="volume"
+            checked={settings.shortAxis === 'volume'}
+            onchange={() => updateSettings({ shortAxis: 'volume' })}
+          />
+          Axis
+        </label>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={settings.voiceLevel}
+        disabled={settings.shortAxis === 'volume'}
+        oninput={(e) => setTone('voiceLevel', Number(e.currentTarget.value))}
+      />
+      <span class="hint">
+        {Math.round(settings.voiceLevel * 100)}%
+        {#if settings.shortAxis === 'volume'} · touch controls this{/if}
+      </span>
+    </div>
+
+    <label>
+      Filter resonance: {settings.filterQ.toFixed(2)}
+      <input
+        type="range"
+        min="0.3"
+        max="3"
+        step="0.05"
+        value={settings.filterQ}
+        oninput={(e) => setTone('filterQ', Number(e.currentTarget.value))}
+      />
+    </label>
+
+    <h3>Envelope</h3>
+
+    <label>
+      Attack: {settings.attack.toFixed(3)} s
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.001"
+        value={timeToPos(settings.attack, ATTACK_MIN, ATTACK_MAX)}
+        oninput={(e) =>
+          setTone('attack', posToTime(Number(e.currentTarget.value), ATTACK_MIN, ATTACK_MAX))}
+      />
+    </label>
+
+    <label>
+      Decay: {settings.decay.toFixed(3)} s
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.001"
+        value={timeToPos(settings.decay, DECAY_MIN, DECAY_MAX)}
+        oninput={(e) =>
+          setTone('decay', posToTime(Number(e.currentTarget.value), DECAY_MIN, DECAY_MAX))}
+      />
+    </label>
+
+    <label>
+      Sustain: {Math.round(settings.sustain * 100)}%
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={settings.sustain}
+        oninput={(e) => setTone('sustain', Number(e.currentTarget.value))}
+      />
+    </label>
+
+    <label>
+      Release: {settings.release.toFixed(3)} s
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.001"
+        value={timeToPos(settings.release, RELEASE_MIN, RELEASE_MAX)}
+        oninput={(e) =>
+          setTone('release', posToTime(Number(e.currentTarget.value), RELEASE_MIN, RELEASE_MAX))}
+      />
+    </label>
+
+    <h3>Wave shape</h3>
+
+    <label>
+      Dark tilt: {settings.darkTilt.toFixed(2)}
+      <span class="hint">higher rolls off the upper partials faster</span>
+      <input
+        type="range"
+        min="0.3"
+        max="3"
+        step="0.05"
+        value={settings.darkTilt}
+        oninput={(e) => setTone('darkTilt', Number(e.currentTarget.value))}
+      />
+    </label>
+
+    <label>
+      Dark even partials: {Math.round(settings.darkEven * 100)}%
+      <span class="hint">0 = hollow/odd-only, 100% = all partials</span>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={settings.darkEven}
+        oninput={(e) => setTone('darkEven', Number(e.currentTarget.value))}
+      />
+    </label>
+
+    <label>
+      Bright tilt: {settings.brightTilt.toFixed(2)}
+      <input
+        type="range"
+        min="0.3"
+        max="3"
+        step="0.05"
+        value={settings.brightTilt}
+        oninput={(e) => setTone('brightTilt', Number(e.currentTarget.value))}
+      />
+    </label>
+
+    <label>
+      Bright even partials: {Math.round(settings.brightEven * 100)}%
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={settings.brightEven}
+        oninput={(e) => setTone('brightEven', Number(e.currentTarget.value))}
+      />
+    </label>
 
     {#if song}
       <div class="song">
@@ -223,7 +542,7 @@
     </label>
 
     <label>
-      Volume: {Math.round(settings.volume * 100)}%
+      Master volume: {Math.round(settings.volume * 100)}%
       <input
         type="range"
         min="0"
@@ -366,6 +685,15 @@
     font-size: 1.1rem;
   }
 
+  h3 {
+    margin: 0.35rem 0 -0.25rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.65;
+  }
+
   .close {
     background: none;
     border: none;
@@ -408,6 +736,79 @@
     border: 1px solid #2b3646;
     background: #1c2430;
     color: inherit;
+  }
+
+  .tone-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.55rem 0.6rem;
+    border-radius: 0.45rem;
+    border: 1px solid #2b3646;
+    background: #1a2230;
+  }
+
+  .tone-row.active {
+    border-color: #4a7fb5;
+    background: #1d2a3a;
+  }
+
+  .tone-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .axis-pick {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  .axis-pick input[type='radio'] {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .save-preset {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .save-preset input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.4rem;
+    border-radius: 0.4rem;
+    border: 1px solid #2b3646;
+    background: #1c2430;
+    color: inherit;
+  }
+
+  .save-preset button,
+  .delete-preset {
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.4rem;
+    border: 1px solid #2b3646;
+    background: #232d3b;
+    color: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .save-preset button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .delete-preset {
+    align-self: flex-start;
+    color: #ffb4b4;
   }
 
   .song {

@@ -62,7 +62,8 @@ describe('AudioEngine voice pool', () => {
   function startVoice(engine: AudioEngine, frequency: number) {
     const voice = engine.allocate()!;
     voice.start({
-      preset: engine.currentPreset,
+      envelope: { attack: 0.015, decay: 0.25, sustain: 0.85, release: 0.2 },
+      filterQ: 0.9,
       waveDark: engine.currentWaveDark!,
       waveBright: engine.currentWaveBright!,
       frequency,
@@ -83,6 +84,20 @@ describe('AudioEngine voice pool', () => {
 
     const pool = (engine as unknown as { pool: unknown[] }).pool;
     expect(pool.length).toBe(MAX_VOICES);
+  });
+
+  it('rebuilds the wave tables from the parametric shape', async () => {
+    const { engine } = makeEngine();
+    await engine.ensureRunning();
+
+    engine.setWaveShape({ darkTilt: 2, darkEven: 0, brightTilt: 0.5, brightEven: 1 });
+
+    const dark = engine.currentWaveDark as unknown as { imag: Float32Array };
+    const bright = engine.currentWaveBright as unknown as { imag: Float32Array };
+    // Index n holds harmonic n: dark is odd-only, bright keeps every partial.
+    expect(dark.imag[2]).toBe(0);
+    expect(bright.imag[2]).toBeGreaterThan(0);
+    expect(bright.imag[1]).toBeGreaterThan(bright.imag[2]);
   });
 
   it('steals an existing voice instead of allocating beyond the cap', async () => {

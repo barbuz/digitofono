@@ -280,7 +280,7 @@ Concrete rules that keep it far from "sharp beeps":
 - **Sustain (hold):** attack 0.015 s → decay 0.20 s → sustain 0.85 → release 0.18 s
   on lift.
 - Implemented with `setValueAtTime` + `linearRampToValueAtTime` /
-  `setTargetAtTime`; envelope times are parameters of a preset.
+  `setTargetAtTime`; envelope times are settings, and a preset supplies a starting set of values.
 
 ### 6.4 Polyphony & voice management
 
@@ -303,7 +303,9 @@ Concrete rules that keep it far from "sharp beeps":
 ## 7. Short-axis parameter
 
 A single setting `shortAxis` selects one of four mappings. Exactly one is active at
-a time; the others take fixed values from the preset.
+a time. The other three use their own stored values, each adjustable independently
+in the settings, so a fixed amount of harmony or morph can sit under a swept
+parameter.
 
 ### 7.1 Timbre (brightness) — *default*
 
@@ -331,7 +333,9 @@ Default tables:
 - **A (dark/hollow):** odd-dominant, fast rolloff — clarinet-ish / mellow.
 - **B (bright/glassy):** richer upper partials — bell/glass.
 
-Additional tables can be added as presets; the crossfade mechanism is generic.
+The two tables are parametric. Each has a rolloff exponent (`tilt`) and an
+even-partial weight, both exposed as sliders. `even = 0` gives an odd-only/hollow
+spectrum; `even = 1` keeps every partial with the same `1/n^tilt` rolloff.
 
 ### 7.3 Harmony (chord)
 
@@ -392,12 +396,17 @@ rests at is the level. Documented behaviour.
 
 ### 7.5 Non-selected parameters
 
-When a parameter is not the short axis, it is set by the preset:
+Every parameter has a stored value. When it is not the short axis, that value is
+used; when it is the axis, the finger's position overrides it. All four values can
+be non-default at once, so a fixed harmony amount or morph position can sit under a
+swept timbre.
 
-- If short axis ≠ Timbre → filter cutoff fixed at preset value (e.g. 2.5 kHz).
-- If short axis ≠ Harmonic morph → fixed crossfade (e.g. 0.35 toward bright).
-- If short axis ≠ Harmony → no harmony notes; a plain single note.
-- If short axis ≠ Volume → fixed master voice gain (e.g. −10 dB).
+- Timbre → stored position on the 300–8000 Hz exponential cutoff curve.
+- Harmonic morph → stored crossfade, 0..1.
+- Harmony → stored chord amount, 0..1 (0 = bare note).
+- Volume → stored per-note level, 0..1 (separate from the master volume).
+
+Editing any of these tone values sets the preset selection to `custom`.
 
 ---
 
@@ -510,41 +519,57 @@ Persisted to `localStorage` (single JSON blob, versioned). Types:
 
 ```ts
 type Scale = 'chromatic' | 'major' | 'minor' | 'majorPentatonic' | ...;
-type ShortAxis = 'timbre' | 'harmonicMorph' | 'volume';
+type ShortAxis = 'timbre' | 'harmonicMorph' | 'harmony' | 'volume';
+type PresetSelection = PresetId | 'custom' | `user:${string}`;
 
-interface Settings {
+interface ToneState {
+  timbre: number;        // 0..1 on the 300..8000 Hz curve
+  morph: number;         // 0..1
+  harmony: number;       // 0..1 chord amount
+  voiceLevel: number;    // 0..1 per-note level
+  filterQ: number;
+  attack: number; decay: number; sustain: number; release: number;
+  darkTilt: number; darkEven: number;
+  brightTilt: number; brightEven: number;
+}
+
+interface Settings extends ToneState {
   version: number;
   baseMidi: number;        // default 48
   octaveSpan: number;      // default 3
-  scale: Scale;            // default 'chromatic' (only scale in v1)
+  scale: Scale;            // default 'chromatic'
   snapStrength: number;    // 0..1, default 0.2
   shortAxis: ShortAxis;    // default 'timbre'
+  harmonyVoicing: HarmonyVoicing;
   volume: number;          // master 0..1, default 0.8
   reverbAmount: number;    // 0..1, default 0.12
-  ensemble: number;        // 0..1, default 0.75 (detuned chorus)
-  vibrato: number;         // 0..1, default 0.2 (pitch movement)
+  ensemble: number;        // 0..1, default 0.75
+  vibrato: number;         // 0..1, default 0.2
   scaleLines: number;      // 0..1 opacity, default 0.5
-  preset: PresetId;        // default 'warm'
-  reducedMotionOverride?: boolean;
+  listen: boolean;
+  preset: PresetSelection; // default 'warm'
 }
 
 interface Preset {
   id: PresetId;
   name: string;
-  attack: number; decay: number; sustain: number; release: number;
-  filterDefaultHz: number; filterQ: number;
-  morphDefault: number;
-  waveDark: number[];      // harmonic amplitudes
-  waveBright: number[];
+  values: ToneState;
 }
 ```
+
+Presets are snapshots, not runtime modes. Selecting one copies its `values` into
+the settings; editing any tone slider sets `preset` to `custom`. User presets are
+saved separately in `localStorage` under `digitofono.userPresets.v1`, so they
+survive a settings reset and are not part of the settings blob.
 
 Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 `bell`, `pad` (slow attack), `pluck` (kalimba-ish).
 
-Settings panel: scale, base note, octave span, snap strength slider (with a clear
-"0 = free glide" marker), short-axis selector, preset selector, master volume,
-reverb, ensemble, vibrato, scale-line opacity.
+Settings panel: preset dropdown (built-ins plus saved presets, with a custom-save
+field), per-parameter tone rows with an Axis radio, filter resonance, envelope
+sliders, wave-shape sliders, scale, base note, octave span, snap strength, master
+volume, reverb, ensemble, vibrato, scale-line opacity, microphone listening, and
+song scale import.
 
 ---
 
@@ -566,7 +591,14 @@ Pure-function coverage is where real bugs hide:
 - `harmony.ts`: diatonic intervals snapped into every scale, `major`/`octaves`
   voicings scale-independent, stack strictly ascending for every voicing; fade-in
   silent at 0 and full at 1, monotonic per note.
-- Settings serialization round-trip; version migration no-op for v1.
+- `waves.ts`: parametric harmonic table (odd-only at even weight 0, all partials
+  at 1, faster rolloff as tilt rises).
+- `params.ts`: stored tone values for non-axis parameters; the selected axis
+  overrides only its own value; fixed harmony produces chord gains.
+- Settings persistence: older blobs hydrate tone values from their stored preset;
+  editing a tone value sets the preset to `custom`; applying a preset copies every
+  tone value.
+- User presets: save, rename-by-name update, delete, and reload from storage.
 
 ### 12.2 Manual device checklist (Phase 0+)
 
@@ -576,6 +608,7 @@ Pure-function coverage is where real bugs hide:
 - [ ] Multi-touch: 3–4 simultaneous fingers, independent pitches, no stuck notes.
 - [ ] Pitch is in tune with snapping on; glide is free with strength 0.
 - [ ] Short-axis switch changes the right parameter live.
+- [ ] Editing a tone slider changes the preset selector to Custom; saving it under a name and reselecting restores the values after a reload.
 - [ ] No page scroll/zoom/pull-to-refresh while playing.
 - [ ] Screen stays awake during play.
 - [ ] Works offline after first load; installable to home screen.
@@ -590,7 +623,7 @@ Pure-function coverage is where real bugs hide:
 |------|--------|-----------|
 | Android Chrome audio latency too high | Kills playability | Measure in Phase 0; tune `latencyHint`, keep graph shallow; fallback: AudioWorklet DSP or Capacitor shell |
 | Clicks/pops | Feels amateur | Enforce ramps; never set gain/freq instantly; envelope min attack |
-| CPU limits (morph/harmony oscillators × polyphony) | Dropouts | Cap polyphony; 2 oscillators per note, ≤ 4 notes/voice when harmony is on; harmony notes only built while the harmony axis is selected |
+| CPU limits (morph/harmony oscillators × polyphony) | Dropouts | Cap polyphony; 2 oscillators per note, ≤ 4 notes/voice when harmony is on; harmony notes built only while the harmony axis is selected or a fixed harmony amount is above zero |
 | GitHub Pages base-path SW scope | PWA silently broken | Explicit `base`; verify SW scope in deployed build early |
 | Pitch precision vs expressiveness | Hard to play melodies | Soft-snap with adjustable strength (core feature) |
 | Locked orientation cropping on rotation | Minor UX | Documented; manifest locks portrait |
@@ -633,8 +666,8 @@ accessibility, touch calibration.
    finger moves and stops on lift.
 3. Pitch is logarithmic across the long axis; with snapping on, notes are reliably
    in tune; with strength 0, pitch is fully free.
-4. The short axis is switchable between timbre, harmonic morph, and volume, and the
-   change is audible live.
+4. The short axis is switchable between timbre, harmonic morph, harmony and volume,
+   and the change is audible live.
 5. Up to 8 simultaneous voices with no dropouts, stuck notes, or clipping.
 6. Ripples/glow render at ~60 fps.
 7. Works offline and is installable; screen stays awake while playing.
@@ -652,7 +685,7 @@ architecture does not preclude it. None of these are commitments.
 | **Recording / looping** | Capture performance via `MediaStreamDestination` + `MediaRecorder`; overdub loop layer. Phase 4. |
 | **Additional scales** | Data-only change once the generic scale layer exists (Major, Minor, Pentatonic, Blues, modes). |
 | **Custom / user-defined scales** | Let the player build their own pitch-class sets. |
-| **Preset editor** | Expose envelope/filter/wave parameters to the player instead of fixed presets. |
+| **Preset sharing** | Custom presets are saved locally. Importing/exporting preset files and renaming from a list are natural follow-ups. |
 | **More harmonic tables** | Extra dark/bright pairs for the morph engine; importable wavetables. |
 | **Per-voice detune / unison** | Two detuned oscillators per note for width (CPU-gated). |
 | **Pan as a short-axis option** | Reserved; weak on phone speakers, good on headphones. |

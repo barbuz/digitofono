@@ -1,7 +1,9 @@
 import { Voice } from './Voice';
-import { buildPeriodicWave, buildImpulseResponse } from './waves';
-import { PRESETS } from './presets';
-import type { Preset } from '../state/schema';
+import { buildPeriodicWave, buildImpulseResponse, harmonicTable } from './waves';
+import { DEFAULT_TONE, type ToneState } from '../state/schema';
+
+/** The four harmonic-table controls a preset can set. */
+export type WaveShape = Pick<ToneState, 'darkTilt' | 'darkEven' | 'brightTilt' | 'brightEven'>;
 
 /**
  * Global pitch vibrato. `detune` is in cents and independent of frequency, so
@@ -47,7 +49,7 @@ export class AudioEngine {
   private vibratoDepth: GainNode | null = null;
 
   private pool: Voice[] = [];
-  private preset: Preset = PRESETS.warm;
+  private waveShape: WaveShape = DEFAULT_TONE;
   private waveDark: PeriodicWave | null = null;
   private waveBright: PeriodicWave | null = null;
 
@@ -179,12 +181,26 @@ export class AudioEngine {
 
   private buildWaveTables(): void {
     if (!this.ctx) return;
-    this.waveDark = buildPeriodicWave(this.ctx, this.preset.waveDark);
-    this.waveBright = buildPeriodicWave(this.ctx, this.preset.waveBright);
+    this.waveDark = buildPeriodicWave(
+      this.ctx,
+      harmonicTable(this.waveShape.darkTilt, this.waveShape.darkEven),
+    );
+    this.waveBright = buildPeriodicWave(
+      this.ctx,
+      harmonicTable(this.waveShape.brightTilt, this.waveShape.brightEven),
+    );
   }
 
-  setPreset(preset: Preset): void {
-    this.preset = preset;
+  setWaveShape(shape: WaveShape): void {
+    if (
+      this.waveShape.darkTilt === shape.darkTilt &&
+      this.waveShape.darkEven === shape.darkEven &&
+      this.waveShape.brightTilt === shape.brightTilt &&
+      this.waveShape.brightEven === shape.brightEven
+    ) {
+      return;
+    }
+    this.waveShape = { ...shape };
     if (this.ctx) this.buildWaveTables();
   }
 
@@ -255,10 +271,6 @@ export class AudioEngine {
 
   get currentWaveBright(): PeriodicWave | null {
     return this.waveBright;
-  }
-
-  get currentPreset(): Preset {
-    return this.preset;
   }
 }
 

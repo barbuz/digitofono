@@ -1,11 +1,16 @@
-import { shortAxisToCutoff, shortAxisToGain, shortAxisToMorph } from '../mapping/shortAxis';
-import { MAX_HARMONY_NOTES, harmonyGains } from '../mapping/harmony';
+import {
+  shortAxisToCutoff,
+  shortAxisToGain,
+  shortAxisToMorph,
+  TIMBRE_MAX_HZ,
+  TIMBRE_MIN_HZ,
+} from '../mapping/shortAxis';
+import { harmonyGains, MAX_HARMONY_NOTES } from '../mapping/harmony';
 import type { Settings } from '../state/schema';
-import type { Preset } from '../state/schema';
 
-/** Cutoff sweep bounds for the timbre short axis. */
-export const TIMBRE_MIN_HZ = 300;
-export const TIMBRE_MAX_HZ = 8000;
+export { TIMBRE_MAX_HZ, TIMBRE_MIN_HZ };
+
+const NO_HARMONY: number[] = new Array(MAX_HARMONY_NOTES).fill(0);
 
 export interface AxisValues {
   cutoffHz: number;
@@ -15,34 +20,21 @@ export interface AxisValues {
   harmony: number[];
 }
 
-/** Harmony notes are silent unless the harmony axis is selected. */
-const NO_HARMONY: number[] = new Array(MAX_HARMONY_NOTES).fill(0);
-
 /**
  * Resolve the continuous voice parameters from the short-axis position.
- * Only the selected short axis follows the finger; the others fall back to the
- * preset defaults so a single axis is always in control.
+ * Only the selected short axis follows the finger; every other parameter uses
+ * its stored value, so all four can be tuned independently.
  */
-export function resolveAxes(settings: Settings, preset: Preset, shortPos: number): AxisValues {
-  let cutoffHz = preset.filterDefaultHz;
-  let morph = preset.morphDefault;
-  let level = 1;
-  let harmony = NO_HARMONY;
+export function resolveAxes(settings: Settings, shortPos: number): AxisValues {
+  const timbre = settings.shortAxis === 'timbre' ? shortPos : settings.timbre;
+  const morph = settings.shortAxis === 'harmonicMorph' ? shortPos : settings.morph;
+  const harmony = settings.shortAxis === 'harmony' ? shortPos : settings.harmony;
+  const level = settings.shortAxis === 'volume' ? shortPos : settings.voiceLevel;
 
-  switch (settings.shortAxis) {
-    case 'timbre':
-      cutoffHz = shortAxisToCutoff(shortPos, { minHz: TIMBRE_MIN_HZ, maxHz: TIMBRE_MAX_HZ });
-      break;
-    case 'harmonicMorph':
-      morph = shortAxisToMorph(shortPos).brightGain;
-      break;
-    case 'harmony':
-      harmony = harmonyGains(shortPos, settings.harmonyVoicing);
-      break;
-    case 'volume':
-      level = shortAxisToGain(shortPos);
-      break;
-  }
-
-  return { cutoffHz, morph, level, harmony };
+  return {
+    cutoffHz: shortAxisToCutoff(timbre, { minHz: TIMBRE_MIN_HZ, maxHz: TIMBRE_MAX_HZ }),
+    morph: shortAxisToMorph(morph).brightGain,
+    harmony: harmony === 0 ? NO_HARMONY : harmonyGains(harmony, settings.harmonyVoicing),
+    level: shortAxisToGain(level),
+  };
 }

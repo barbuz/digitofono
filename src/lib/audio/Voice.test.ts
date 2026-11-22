@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Voice } from './Voice';
 import { FakeAudioContext, FakeGain } from './fakeAudio';
-import { PRESETS } from './presets';
-
-const preset = PRESETS.warm;
-
 function baseParams() {
   return {
-    preset,
+    envelope: { attack: 0.015, decay: 0.25, sustain: 0.85, release: 0.2 },
+    filterQ: 0.9,
     waveDark: {} as PeriodicWave,
     waveBright: {} as PeriodicWave,
     frequency: 220,
