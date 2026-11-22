@@ -131,6 +131,90 @@ verified on a real device.
   overrides `settings.scale` through `updateSongScale`, and `PlaySurface` draws
   both the guide lines and the axis span from the song when one is loaded. Never
   route the analysed file to `destination` - it is analysed, never played.
+  - `MAX_ANALYSIS_SECONDS = 90` is **load-bearing, not a shortcut**. Measured
+    against five tracks with verified keys (see
+    `/workspace/tools/song-analysis/README.md`), the first 90 s scores 4/5,
+    the whole track 2/5, and 30 s sections with a majority vote 3/5. Summing
+    more audio lets later sections dilute the key statement: *Yesterday* is
+    correct at 90 s and flips to the wrong pitch-class set at 120 s, and *Baby
+    One More Time* does the same. Do not remove the cap to "use the whole
+    song" - it makes the feature worse. The tuning estimate is stable to ~1
+    cent across window lengths, so the degradation is not a drifting pitch
+    reference.
+  - Ground truth for this feature must be **measured, not inferred**. A
+    Krumhansl-profile key finder scored 13/24 on synthesized songs, reporting
+    every minor key as its parallel major; using it as the reference produced
+    two false bug reports. Measure energy on the specific semitone, in the
+    octave where it is resolvable. Relative keys share a pitch-class set, so
+    a label flip between them is harmless; only a set change affects the frets.
+  - `CHROMA_MIN_HZ = 110` is **exactly A2 (110.00 Hz)**, and that coincidence was
+    the whole of the A/Ab mislabelling. Ab2 is 103.83 Hz, so it fell below the
+    cutoff and was discarded, while A2 sat on the first analysed bin and
+    survived. Octave 2 contributed 169.9 to A and **zero** to Ab; remove that
+    octave and Ab wins on Albatraoz by 61. The chroma was not saying "A is
+    stronger", it was saying "Ab was never measured where it was strongest".
+  - **The fix is `EDGE_TAPER_SEMITONES`, not moving the cutoff.** Peaks are
+    weighted by a raised-cosine ramp over one semitone at each end of the band,
+    so no single pitch class sits on an unattenuated edge. Measured on two equal
+    tones A2+B2, the hard edge returned A/B = 1.39; the taper returns 0.80. Do
+    **not** lower `CHROMA_MIN_HZ` instead: 95 Hz scores 3/7 and 80 Hz 2/7,
+    because the band below 110 Hz is mostly kick and rumble. The regression test
+    in `chroma.test.ts` pins the A2/B2 ratio and fails if the taper is removed.
+  - The taper does what it was written for: on Albatraoz it drops A from 0.990
+    to 0.756, so the track is no longer labelled with an A it does not contain.
+    It does **not** make the track's note set correct - see the open F# bug
+    below. Taper width is load-bearing; 0.5 and 0.75 are too narrow to move A.
+  - Do not "fix" the edge by widening the magnitude scan beyond the band to make
+    the `magnitude[bin] > magnitude[bin-1]` neighbour test valid at the borders.
+    That was measured and is neutral-to-harmful (it admits the very low content
+    the cutoff exists to reject), so `findPeaks` still scans only the band.
+  - **Known open bug: both Albatraoz and I'm Still Standing gain one spurious
+    note**, and it is the same bug twice. The track's chroma is very flat, so an
+    out-of-key note clears the in-key median and passes the gate:
+    - Albatraoz: selected `C D D# F F# G G# A#` - extra F#, a tie against the
+      real F in every octave (0.94, 1.11, 0.95, 1.28, 0.97).
+    - I'm Still Standing: selected `C C# D# F F# G# A A#` - extra A, a tie
+      against the real G# (G#/A = 1.088, F/F# = 1.089 from the app's own
+      chroma). The key *label* is right here (A# minor: minor third C# 1.205
+      beats major third D 1.074, bass A# strongest at 1.209), so only the note
+      set is wrong.
+    Both are ties by the project's own decisiveness rule (a pair needs >=1.15 or
+    <=0.87 to decide), and in both the app keeps the *upper* semitone. Do not
+    treat a tie as a note.
+  - **`OUT_OF_KEY_RATIO` is 1.3, and that is a deliberate trade, not a free win.**
+    The bar sits above 1 because the in-key median is not the right height for a
+    *flat* chroma: every bin of a dense mix carries bleed from its neighbours, so
+    a semitone that is not in the song still lands at 1.03-1.18x the median. At 1
+    the borrowed-note branch fired on 3 of 10 tracks and **every** firing was
+    wrong (Albatraoz F# at 1.05x, I'm Still Standing A at 1.18x, Ballata
+    dell'amore cieco G# at 1.03x and A# at 1.08x). At 1.3 the corpus is 10/10.
+  - **But the branch now fires on 0 of 10 tracks**, because no pitch class in
+    any of those recordings exceeds 1.35x the median. So in practice this is "the
+    seven-note key, no borrowed notes". The corpus contains no true positive for
+    the borrowed-note feature, so 1.3 is the best value the evidence supports,
+    not a value proven to preserve borrowed chords. If a song with a real
+    borrowed chord appears, measure where that note sits before trusting the bar.
+    A note at 1.09x is *not* evidence of a borrowed chord - that is inside the
+    measured noise band, and `songScale.test.ts` now pins it as a drop.
+  - The threshold is a symptom-level knob. The cause is that the chroma is too
+    flat to separate a note from bleed; a sharper chroma would need no such bar.
+  - **A song that changes key has no correct single answer**, and no threshold
+    helps. `Ballata dell'amore cieco` is A natural minor until ~95 s then A#
+    natural minor; the union of the two keys is all twelve pitch classes. The app
+    analyses only `MAX_ANALYSIS_SECONDS = 90` (`input/songFile.ts`) and folds
+    that into one chroma (`input/analysis.worker.ts`), so its label describes the
+    first 90 s. For that window A natural minor *is* the correct answer, and 1.3
+    returns exactly `C D E F G A B`. Section-wise analysis is a known future
+    feature, not a bug in this constant.
+  - Attempts measured and rejected for the spurious note, so they are not
+    repeated: `MAX_HARMONIC` 10-16 (F# unchanged at 0.85); pruning against
+    sub-band bass roots (C2's 11th harmonic is F#) (no change); `NOISE_FLOOR`
+    0.04-0.08 (chroma stays flat); judging out-of-key notes against the in-key
+    *peak* instead of the median (0/8 to 5/8); `CHROMA_MAX_HZ` 1000-1500 (6/8);
+    linear peak weight instead of `sqrt` (flatness gets worse, Elton flips to
+    A# major); and forcing the tuning offset to 0 (5/8, Elton unchanged). The
+    cause is upstream: a flat chroma cannot separate a note from bleed. Improve
+    chroma contrast, not the selection threshold.
 
 - Microphone listening (`settings.listen`, off by default) highlights the pitch
   heard around the instrument. The pure detector is `mapping/pitchDetect.ts`
@@ -171,13 +255,27 @@ verified on a real device.
   prior reorders that list, so comparing to the runner-up in score order measures
   the chosen key against a rival the prior already demoted and overclaims. A key
   that only won because of the prior correctly reports low confidence.
-- Known limitation: a semitone apart at A3 (207.65 vs 220 Hz) is not a resolution
-  problem - at 11 kHz with a 4096 frame the FFT already has ~4.9 bins per semitone
-  there. The main pass counts *peaks* and weights them by `sqrt`, so a weak
-  spectral smear counts nearly as much as a real note. High-resolution analysis of
-  the reference track shows the Ab band actually holds more energy than A (1.24x),
-  yet A wins on peak count. Fixing this means an energy-based chroma rather than
-  peak counting; it is a larger change and not yet made.
+- The main pass's window length is derived from the sample rate, not fixed at a
+  sample count: `frameSizeFor(rate)` keeps it at ~372 ms, which is 4096 samples
+  at 11 kHz (unchanged) and 16384 at 44.1 kHz. A fixed 4096-point frame is 372 ms
+  at 11 kHz but only 93 ms at 44.1 kHz, where a semitone at A2 is *less* than one
+  bin wide - raising the decode rate would then make resolution worse, and did:
+  the same song was reported as a different key at each rate. Keep the window
+  constant in time and the answer stops depending on the rate.
+- `CHROMA_MIN_HZ` is a hard band edge, and where it lands is arbitrary because
+  `lowestBin = ceil(110 / binHz)` rounds to a bin. At 11 kHz the band starts at
+  110.4 Hz, so A2 (110.0 Hz) leaks into the first kept bin while Ab2 (103.8 Hz) is
+  cut entirely - the low octave, where the key evidence is, gets discarded and a
+  biased top octave decides. This is a known open issue, not yet fixed.
+- Known limitation: the main pass counts *peaks* and weights them by `sqrt`, so a
+  weak spectral smear counts nearly as much as a real note. On Albatraoz and
+  Britney (both C natural minor) the app over-scores A against Ab and can report
+  C dorian or G natural minor instead of C natural minor. Do not explain this as a
+  harmonic artifact: notching every D and every F fundamental out of the audio
+  left the phantom A *higher*, so it is not the third harmonic of D or the fifth
+  of F. On clean synthetic material the same code returns the correct frets, so
+  the bias needs a dense real mix to appear. Fixing it means an energy-based
+  chroma rather than peak counting; it is a larger change and not yet made.
 
 ## Deployment
 

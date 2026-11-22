@@ -39,12 +39,57 @@ export interface ChromaResult {
  * separate pass with a frame long enough to resolve it - see `BASS_*` - rather
  * than folded into this one, where lowering the cutoff costs real chord tones
  * (C2's third harmonic is G) more than it gains.
+ *
+ * A hard edge has to fall somewhere, and wherever it falls it attenuates every
+ * note below it and none above, which hands the pitch class sitting on the edge
+ * a free win. 110 Hz is exactly A2 (110.00 Hz) while Ab2 is 103.83 Hz, so Ab2
+ * was discarded outright and A2 was never attenuated. That positional
+ * advantage is large enough to move the key finder: a piece in C minor, whose
+ * Ab is a chord tone, was named in a key containing A. The edge is therefore
+ * tapered by `EDGE_TAPER_SEMITONES`, which spreads the loss over several
+ * semitones instead of dropping one note outright.
+ *
+ * The cutoff still sits on A2. Moving it is *not* the fix and makes things
+ * worse - the band below ~110 Hz is mostly kick and rumble - so the taper is
+ * what removes the bias, not the position.
  */
 export const CHROMA_MIN_HZ = 110;
 export const CHROMA_MAX_HZ = 2000;
 
-export const FRAME_SIZE = 4096;
-export const HOP_SIZE = 2048;
+/**
+ * Width of the taper at each end of the analysis band, in semitones.
+ *
+ * A peak is weighted by a raised-cosine ramp over this range, so a note in the
+ * interior counts fully, a note at the very edge counts half, and the loss is
+ * spread across a semitone instead of landing on one note. This is what stops
+ * the cutoff from promoting whichever pitch class happens to sit on it: at
+ * 110 Hz with no taper, A2 was the only note below the edge that was never
+ * attenuated, and that positional advantage alone was enough to pull the key
+ * finder off a key in which A does not appear.
+ */
+const EDGE_TAPER_SEMITONES = 1;
+
+/**
+ * Analysis window length, in seconds rather than samples.
+ *
+ * The window must be long enough that a semitone near the bottom of the band
+ * spans several FFT bins, and that requirement is about *time*, not sample
+ * count: a fixed 4096-point frame is 372 ms at 11 kHz but only 93 ms at 44 kHz,
+ * where a semitone at A2 is less than one bin wide. Deriving the length from
+ * the sample rate keeps the frequency resolution the same at every rate, so
+ * changing the decode rate no longer silently changes the answer.
+ *
+ * 372 ms is what the analysis has always used at 11 kHz, and is kept as the
+ * reference so the default configuration behaves exactly as before.
+ */
+const FRAME_SECONDS = 4096 / 11025;
+
+/** Frame length for `sampleRate`, rounded to the power of two the FFT needs. */
+export function frameSizeFor(sampleRate: number): number {
+  const ideal = FRAME_SECONDS * sampleRate;
+  const size = 2 ** Math.round(Math.log2(ideal));
+  return Math.min(32768, Math.max(1024, size));
+}
 
 /**
  * Bass band, and the frame length that resolves it.
@@ -143,26 +188,30 @@ export function analyzeChroma(
   sampleRate: number,
   onProgress?: (fraction: number) => void,
 ): ChromaResult | null {
-  if (samples.length < FRAME_SIZE || !(sampleRate > 0)) return null;
+  if (!(sampleRate > 0)) return null;
 
-  const fft = new Fft(FRAME_SIZE);
-  const window = hannWindow(FRAME_SIZE);
-  const re = new Float32Array(FRAME_SIZE);
-  const im = new Float32Array(FRAME_SIZE);
-  const magnitude = new Float32Array(FRAME_SIZE / 2);
+  const frameSize = frameSizeFor(sampleRate);
+  const hopSize = frameSize / 2;
+  if (samples.length < frameSize) return null;
+
+  const fft = new Fft(frameSize);
+  const window = hannWindow(frameSize);
+  const re = new Float32Array(frameSize);
+  const im = new Float32Array(frameSize);
+  const magnitude = new Float32Array(frameSize / 2);
   const midiHistogram = new Float64Array(MIDI_HISTOGRAM_SIZE);
 
-  const binHz = sampleRate / FRAME_SIZE;
+  const binHz = sampleRate / frameSize;
   const lowestBin = Math.max(2, Math.ceil(CHROMA_MIN_HZ / binHz));
-  const highestBin = Math.min(FRAME_SIZE / 2 - 2, Math.floor(CHROMA_MAX_HZ / binHz));
-  const frameCount = Math.floor((samples.length - FRAME_SIZE) / HOP_SIZE) + 1;
+  const highestBin = Math.min(frameSize / 2 - 2, Math.floor(CHROMA_MAX_HZ / binHz));
+  const frameCount = Math.floor((samples.length - frameSize) / hopSize) + 1;
 
   const total = new Float64Array(FINE_BINS_PER_OCTAVE);
   let analysed = 0;
 
   for (let frame = 0; frame < frameCount; frame += 1) {
-    const offset = frame * HOP_SIZE;
-    for (let i = 0; i < FRAME_SIZE; i += 1) {
+    const offset = frame * hopSize;
+    for (let i = 0; i < frameSize; i += 1) {
       re[i] = samples[offset + i] * window[i];
       im[i] = 0;
     }
@@ -335,6 +384,8 @@ function findPeaks(
 ): SpectralPeak[] {
   const floor = framePeak * NOISE_FLOOR;
   const peaks: SpectralPeak[] = [];
+  const lowMidi = binToMidi(lowestBin, binHz);
+  const highMidi = binToMidi(highestBin, binHz);
 
   for (let bin = lowestBin; bin <= highestBin; bin += 1) {
     const value = magnitude[bin];
@@ -342,10 +393,11 @@ function findPeaks(
     if (value <= magnitude[bin - 1] || value < magnitude[bin + 1]) continue;
 
     const refinedBin = refinePeakBin(magnitude, bin);
+    const midi = 69 + 12 * Math.log2((refinedBin * binHz) / 440);
 
     peaks.push({
-      midi: 69 + 12 * Math.log2((refinedBin * binHz) / 440),
-      weight: Math.sqrt(value / framePeak),
+      midi,
+      weight: Math.sqrt(value / framePeak) * edgeWeight(midi, lowMidi, highMidi),
     });
   }
 
@@ -368,12 +420,37 @@ function findPeaks(
   return kept;
 }
 
+/** Continuous MIDI value of an FFT bin. */
+function binToMidi(bin: number, binHz: number): number {
+  return 69 + 12 * Math.log2((bin * binHz) / 440);
+}
+
 /** Split a weight between the two fine bins it falls between. */
 function addFine(fine: Float64Array, position: number, weight: number): void {
   const lower = Math.floor(position);
   const fraction = position - lower;
   fine[mod(lower, FINE_BINS_PER_OCTAVE)] += weight * (1 - fraction);
   fine[mod(lower + 1, FINE_BINS_PER_OCTAVE)] += weight * fraction;
+}
+
+/**
+ * How much a peak at `midi` counts, given the tapered ends of the band.
+ *
+ * Full weight through the interior, falling to half at the very edge along a
+ * raised cosine. Applied to the peak's weight rather than to the band bounds so
+ * a note that straddles the edge is scaled by how much of it lies inside, which
+ * is what a hard cutoff was approximating.
+ */
+function edgeWeight(midi: number, lowMidi: number, highMidi: number): number {
+  if (!(midi >= lowMidi && midi <= highMidi)) return 0;
+  const taper = EDGE_TAPER_SEMITONES;
+  if (!(taper > 0)) return 1;
+
+  const fromLow = midi - lowMidi;
+  const fromHigh = highMidi - midi;
+  const ramp = Math.min(fromLow, fromHigh) / taper;
+  if (ramp >= 1) return 1;
+  return 0.5 + 0.5 * Math.cos(Math.PI * (1 - Math.max(0, ramp)));
 }
 
 /**

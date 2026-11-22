@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeChroma } from './chroma';
+import { analyzeChroma, frameSizeFor } from './chroma';
 import { midiToFrequency } from './pitch';
 
 const SAMPLE_RATE = 11025;
@@ -43,6 +43,37 @@ function classesAbove(chroma: number[], fraction: number): number[] {
     .filter((entry) => entry.value >= peak * fraction)
     .map((entry) => entry.pc);
 }
+
+describe('frameSizeFor', () => {
+  it('keeps the window the same length in time at every rate', () => {
+    for (const rate of [8000, 11025, 22050, 32000, 44100, 48000]) {
+      const seconds = frameSizeFor(rate) / rate;
+      // Within one power-of-two step of the 372 ms reference window.
+      expect(seconds).toBeGreaterThan(0.26);
+      expect(seconds).toBeLessThan(0.53);
+    }
+  });
+
+  it('returns a power of two, which the FFT requires', () => {
+    for (const rate of [8000, 11025, 16000, 22050, 32000, 44100, 48000, 96000]) {
+      const size = frameSizeFor(rate);
+      expect(size & (size - 1)).toBe(0);
+    }
+  });
+
+  it('leaves the 11 kHz analysis exactly as it was', () => {
+    expect(frameSizeFor(11025)).toBe(4096);
+  });
+
+  it('gives a semitone near the bottom of the band several bins at any rate', () => {
+    // A2 (110 Hz) to A#2 (116.54 Hz) is 6.54 Hz; it must not collapse into one
+    // bin, which is what a fixed sample-count frame did at high rates.
+    const semitoneHz = midiToFrequency(69) * (Math.pow(2, 1 / 12) - 1);
+    for (const rate of [11025, 22050, 44100, 48000]) {
+      expect(semitoneHz / (rate / frameSizeFor(rate))).toBeGreaterThan(1.5);
+    }
+  });
+});
 
 describe('analyzeChroma', () => {
   it('returns null for silence and for buffers shorter than a frame', () => {
@@ -189,5 +220,33 @@ describe('bass profile', () => {
     quiet!.bass.forEach((value, index) => {
       expect(value).toBeCloseTo(loud!.bass[index], 2);
     });
+  });
+});
+
+describe('band edge', () => {
+  /**
+   * Two notes of equal amplitude must come back with equal weight. A2 sits
+   * exactly on CHROMA_MIN_HZ and B2 does not, so a hard band edge inflates A2
+   * purely because of where it falls - measured at 1.39x before the taper.
+   */
+  it('weighs notes either side of the low cutoff equally', () => {
+    const a = melody([45], 0, 2);
+    const b = melody([47], 0, 2);
+    const mix = new Float32Array(Math.min(a.length, b.length));
+    for (let i = 0; i < mix.length; i += 1) mix[i] = a[i] + b[i];
+
+    const result = analyzeChroma(mix, SAMPLE_RATE);
+    expect(result).not.toBeNull();
+
+    const ratio = result!.chroma[9] / result!.chroma[11];
+    expect(ratio).toBeGreaterThan(0.75);
+    expect(ratio).toBeLessThan(1.15);
+  });
+
+  it('still hears the lowest note of the band', () => {
+    const result = analyzeChroma(melody([45, 45, 57, 57]), SAMPLE_RATE);
+    expect(result).not.toBeNull();
+    const { chroma } = result!;
+    expect(chroma[9] / Math.max(...chroma)).toBeGreaterThan(0.5);
   });
 });
