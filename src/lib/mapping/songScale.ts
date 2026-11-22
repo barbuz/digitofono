@@ -106,19 +106,18 @@ export const SUPPORT_FRACTION = 0.12;
  * The bar sits above 1, at 1.3, because the median is not the right height for
  * a *flat* chroma. Every pitch class of a dense mix carries bleed from its
  * neighbours, so a semitone that is not in the song can still land at the
- * median: on the reference corpus the spurious note is always 1.03-1.18x the
- * median, never below it. At 1 the branch fired on 3 of 10 tracks and every
- * one of those additions was wrong (Albatraoz F#, I'm Still Standing A, and
- * both G# and A# on Ballata dell'amore cieco).
+ * median: such a spurious note measures 1.03-1.18x the median, never below it.
+ * At 1 the bar sat inside that band, so it admitted the note whenever the
+ * chroma was flat, and every addition it made was a semitone that ties with a
+ * real note rather than a note of the song.
  *
- * Be aware of what 1.3 buys and what it costs. It scores 10/10 on the corpus,
- * but no pitch class in any of those ten recordings exceeds 1.35x the median,
- * so the branch now fires on **0 of 10** tracks: in practice this is a
- * seven-note key with no borrowed notes, and the borrowed-note path is
- * unreachable on ordinary material. The corpus has no true positive for it, so
- * 1.3 is the best value the evidence supports, not a value that has been shown
- * to preserve borrowed notes. If a song with a real borrowed chord turns up,
- * measure where that note sits before trusting this bar.
+ * Be aware of what 1.3 buys and what it costs. Spurious notes from bleed stay
+ * below roughly 1.35x the median, so a bar at 1.3 also silences the
+ * borrowed-note path on ordinary material: in practice this returns a
+ * seven-note key with no borrowed notes. A genuinely played borrowed chord has
+ * not been measured against this bar, so treat that path as untested rather
+ * than working. If one turns up, measure where it sits before trusting the
+ * value.
  */
 export const OUT_OF_KEY_RATIO = 1.3;
 
@@ -136,8 +135,8 @@ const OUTSIDE_PENALTY = 0.35;
  * far more energy in the bass than the profile expects, so without this a song
  * whose bass sits on C can be named after the F chord above it.
  *
- * The value is deliberately small: it is a tie-breaker, not a decision. On the
- * reference track the prior has to move a 0.011 template margin, while a clear
+ * The value is deliberately small: it is a tie-breaker, not a decision. In the
+ * ambiguous case the prior has to move a 0.011 template margin, while a clear
  * fit (a C major passage with G in the bass) wins by 0.082 and must survive.
  * Any weight between those two does both; 0.04 sits near their geometric middle
  * so a little extra evidence either way does not flip the outcome.

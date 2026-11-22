@@ -43,10 +43,11 @@ export interface ChromaResult {
  * A hard edge has to fall somewhere, and wherever it falls it attenuates every
  * note below it and none above, which hands the pitch class sitting on the edge
  * a free win. 110 Hz is exactly A2 (110.00 Hz) while Ab2 is 103.83 Hz, so Ab2
- * was discarded outright and A2 was never attenuated: on a C-minor track that
- * alone was enough to make the key finder choose A over Ab. The edge is
- * therefore tapered by `EDGE_TAPER_SEMITONES`, which spreads the loss over
- * several semitones instead of dropping one note outright.
+ * was discarded outright and A2 was never attenuated. That positional
+ * advantage is large enough to move the key finder: a piece in C minor, whose
+ * Ab is a chord tone, was named in a key containing A. The edge is therefore
+ * tapered by `EDGE_TAPER_SEMITONES`, which spreads the loss over several
+ * semitones instead of dropping one note outright.
  *
  * The cutoff still sits on A2. Moving it is *not* the fix and makes things
  * worse - the band below ~110 Hz is mostly kick and rumble - so the taper is
@@ -63,7 +64,8 @@ export const CHROMA_MAX_HZ = 2000;
  * spread across a semitone instead of landing on one note. This is what stops
  * the cutoff from promoting whichever pitch class happens to sit on it: at
  * 110 Hz with no taper, A2 was the only note below the edge that was never
- * attenuated, and that was enough to name a C-minor track in a key containing A.
+ * attenuated, and that positional advantage alone was enough to pull the key
+ * finder off a key in which A does not appear.
  */
 const EDGE_TAPER_SEMITONES = 1;
 

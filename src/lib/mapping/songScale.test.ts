@@ -134,10 +134,10 @@ describe('selectPitchClasses', () => {
 
   it('keeps an out-of-key note that stands clearly above the bleed floor', () => {
     // C major with a prominent borrowed note. It has to be louder than the
-    // in-key notes' own bleed to be distinguishable: on the reference corpus a
-    // pitch class that is *not* in the song still measures 1.03-1.18x the
-    // in-key median, because every bin picks up energy from its neighbours.
-    // A borrowed chord that is actually played sits above that band.
+    // in-key notes' own bleed to be distinguishable: a pitch class that is
+    // *not* in the song still measures 1.03-1.18x the in-key median, because
+    // every bin picks up energy from its neighbours. A borrowed chord that is
+    // actually played sits above that band.
     const chroma = chromaOf([0, 2, 4, 5, 7, 9, 11]);
     for (const pc of [0, 2, 4, 5, 7, 9, 11]) chroma[pc] = 0.5 + (pc % 4) * 0.05;
     chroma[8] = 0.85;
@@ -146,12 +146,11 @@ describe('selectPitchClasses', () => {
   });
 
   it('drops an out-of-key note that only reaches the in-key median', () => {
-    // This is the measured failure mode, not a hypothetical: Albatraoz gains an
-    // F# at 1.05x the median, I'm Still Standing an A at 1.18x, and Ballata
-    // dell'amore cieco a G# at 1.03x and an A# at 1.08x. None is in its song.
-    // The old threshold of 1 kept a note here, which is why every one of those
-    // tracks got a fret it should not have had. 0.6 against a 0.55 median is
-    // 1.09x - the same height as those real spurious notes.
+    // The measured failure mode, not a hypothetical: a semitone that ties with
+    // a real note lands at 1.03-1.18x the median and is not a note of the song.
+    // The old threshold of 1 kept it, which is how a semitone tie became a
+    // fret. 0.6 against a 0.55 median is 1.09x - the same height as those real
+    // spurious notes.
     const chroma = chromaOf([0, 2, 4, 5, 7, 9, 11]);
     for (const pc of [0, 2, 4, 5, 7, 9, 11]) chroma[pc] = 0.5 + (pc % 4) * 0.05;
     chroma[8] = 0.6;
