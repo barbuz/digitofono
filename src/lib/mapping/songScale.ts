@@ -102,8 +102,25 @@ export const SUPPORT_FRACTION = 0.12;
  * in-key note tracks each recording's own floor, so the bar lands where the
  * song's real notes are. A borrowed chord is as loud as the chords around it,
  * so "as strong as the typical in-key note" is the right height for the bar.
+ *
+ * The bar sits above 1, at 1.3, because the median is not the right height for
+ * a *flat* chroma. Every pitch class of a dense mix carries bleed from its
+ * neighbours, so a semitone that is not in the song can still land at the
+ * median: on the reference corpus the spurious note is always 1.03-1.18x the
+ * median, never below it. At 1 the branch fired on 3 of 10 tracks and every
+ * one of those additions was wrong (Albatraoz F#, I'm Still Standing A, and
+ * both G# and A# on Ballata dell'amore cieco).
+ *
+ * Be aware of what 1.3 buys and what it costs. It scores 10/10 on the corpus,
+ * but no pitch class in any of those ten recordings exceeds 1.35x the median,
+ * so the branch now fires on **0 of 10** tracks: in practice this is a
+ * seven-note key with no borrowed notes, and the borrowed-note path is
+ * unreachable on ordinary material. The corpus has no true positive for it, so
+ * 1.3 is the best value the evidence supports, not a value that has been shown
+ * to preserve borrowed notes. If a song with a real borrowed chord turns up,
+ * measure where that note sits before trusting this bar.
  */
-export const OUT_OF_KEY_RATIO = 1;
+export const OUT_OF_KEY_RATIO = 1.3;
 
 /** Below this many present pitch classes the recording is not a song. */
 export const MIN_PITCH_CLASSES = 3;

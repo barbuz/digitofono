@@ -132,15 +132,31 @@ describe('selectPitchClasses', () => {
     expect(selectPitchClasses(chroma, key)).toEqual([0, 2, 4, 7, 9]);
   });
 
-  it('keeps a strong out-of-key note, which is a real borrowed note', () => {
-    // C major with a strong Ab: a borrowed chord, not noise. The key degrees
-    // have to carry a realistic spread - an all-equal chroma cannot tell a
-    // borrowed chord from the chords around it, and no recording looks like that.
+  it('keeps an out-of-key note that stands clearly above the bleed floor', () => {
+    // C major with a prominent borrowed note. It has to be louder than the
+    // in-key notes' own bleed to be distinguishable: on the reference corpus a
+    // pitch class that is *not* in the song still measures 1.03-1.18x the
+    // in-key median, because every bin picks up energy from its neighbours.
+    // A borrowed chord that is actually played sits above that band.
+    const chroma = chromaOf([0, 2, 4, 5, 7, 9, 11]);
+    for (const pc of [0, 2, 4, 5, 7, 9, 11]) chroma[pc] = 0.5 + (pc % 4) * 0.05;
+    chroma[8] = 0.85;
+    const key = rankKeys(chroma)[0];
+    expect(selectPitchClasses(chroma, key)).toContain(8);
+  });
+
+  it('drops an out-of-key note that only reaches the in-key median', () => {
+    // This is the measured failure mode, not a hypothetical: Albatraoz gains an
+    // F# at 1.05x the median, I'm Still Standing an A at 1.18x, and Ballata
+    // dell'amore cieco a G# at 1.03x and an A# at 1.08x. None is in its song.
+    // The old threshold of 1 kept a note here, which is why every one of those
+    // tracks got a fret it should not have had. 0.6 against a 0.55 median is
+    // 1.09x - the same height as those real spurious notes.
     const chroma = chromaOf([0, 2, 4, 5, 7, 9, 11]);
     for (const pc of [0, 2, 4, 5, 7, 9, 11]) chroma[pc] = 0.5 + (pc % 4) * 0.05;
     chroma[8] = 0.6;
     const key = rankKeys(chroma)[0];
-    expect(selectPitchClasses(chroma, key)).toContain(8);
+    expect(selectPitchClasses(chroma, key)).not.toContain(8);
   });
 
   it('drops a weak out-of-key note as noise', () => {

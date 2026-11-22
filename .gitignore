@@ -6,3 +6,11 @@ dist-ssr
 .vite
 coverage
 public/icons
+
+# Local audio for manual testing; keep out of git (copyright + size).
+*.mp3
+*.MP3
+*.wav
+*.m4a
+*.flac
+*.ogg
