@@ -26,6 +26,8 @@
   import type { HarmonyVoicing } from '../mapping/harmony';
   import type { SongScale } from '../mapping/songScale';
 
+  const barbuzMark = `${import.meta.env.BASE_URL}barbuz-mark.svg`;
+
   let {
     settings,
     open = $bindable(false),
@@ -652,7 +654,10 @@
         <span>digitofono</span>
       </div>
       <p class="about-links">
-        <a href="https://barbuz.github.io">made by barbuz</a>
+        <a class="about-barbuz" href="https://barbuz.github.io" aria-label="made by barbuz">
+          <img class="about-barbuz-mark" src={barbuzMark} alt="" />
+          <span>made by <strong>arbuz</strong></span>
+        </a>
         <span aria-hidden="true">·</span>
         <a href="https://github.com/barbuz/digitofono">source <span aria-hidden="true">↗</span></a>
         <span aria-hidden="true">·</span>
@@ -1017,6 +1022,27 @@
 
   .about-links a:hover {
     color: var(--accent);
+  }
+
+  .about-barbuz {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .about-barbuz-mark {
+    height: 1.05em;
+    width: auto;
+    display: block;
+  }
+
+  .about-barbuz strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .about-barbuz:hover strong {
+    color: inherit;
   }
 
   .build {
