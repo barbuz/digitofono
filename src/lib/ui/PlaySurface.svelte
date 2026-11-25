@@ -40,6 +40,26 @@
   let dpr = 1;
   let reducedMotion = false;
 
+  type Rgb = [number, number, number];
+  let palette = {
+    accent: [61, 123, 255] as Rgb,
+    warning: [240, 180, 41] as Rgb,
+    text: [231, 234, 242] as Rgb,
+    muted: [138, 148, 170] as Rgb,
+  };
+
+  function readRgb(name: string, fallback: Rgb): Rgb {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const match = /^#([0-9a-f]{6})$/i.exec(raw);
+    if (!match) return fallback;
+    const value = Number.parseInt(match[1], 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  }
+
+  function rgba([r, g, b]: Rgb, alpha: number): string {
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
   /**
    * The scale the instrument is playing: a song's pitch classes when one is
    * loaded, otherwise the built-in scale from the settings.
@@ -86,8 +106,8 @@
     const gradient = vertical
       ? ctx.createLinearGradient(0, height, 0, 0)
       : ctx.createLinearGradient(0, 0, width, 0);
-    gradient.addColorStop(0, 'rgba(90, 120, 200, 0.05)');
-    gradient.addColorStop(1, 'rgba(120, 200, 255, 0.16)');
+    gradient.addColorStop(0, rgba(palette.accent, 0.05));
+    gradient.addColorStop(1, rgba(palette.accent, 0.18));
 
     ctx.fillStyle = gradient;
     if (vertical) {
@@ -104,8 +124,8 @@
       for (const line of lines) {
         const alpha = settings.scaleLines * (line.isTonic ? 1 : 0.6);
         ctx.strokeStyle = line.isTonic
-          ? `rgba(170, 215, 255, ${alpha})`
-          : `rgba(150, 190, 235, ${alpha})`;
+          ? rgba(palette.text, alpha)
+          : rgba(palette.muted, alpha * 0.7);
         ctx.beginPath();
         if (vertical) {
           const py = (1 - line.pos) * height;
@@ -128,7 +148,7 @@
       const inside = pos > 0 && pos < 1;
       ctx.save();
       ctx.lineWidth = 2.5 * dpr;
-      ctx.strokeStyle = inside ? 'rgba(255, 230, 160, 0.9)' : 'rgba(255, 200, 120, 0.45)';
+      ctx.strokeStyle = rgba(palette.warning, inside ? 0.9 : 0.45);
       ctx.setLineDash(inside ? [] : [6 * dpr, 6 * dpr]);
       ctx.beginPath();
       if (vertical) {
@@ -150,8 +170,8 @@
       const py = touch.y * dpr;
       const radius = (touch.held ? 90 : 55) * dpr;
       const glow = ctx.createRadialGradient(px, py, 0, px, py, radius);
-      glow.addColorStop(0, 'rgba(140, 200, 255, 0.32)');
-      glow.addColorStop(1, 'rgba(140, 200, 255, 0)');
+      glow.addColorStop(0, rgba(palette.accent, 0.32));
+      glow.addColorStop(1, rgba(palette.accent, 0));
       ctx.fillStyle = glow;
       ctx.beginPath();
       ctx.arc(px, py, radius, 0, Math.PI * 2);
@@ -164,7 +184,7 @@
       const t = reducedMotion ? 1 : (now - ripple.start) / 450;
       const radius = (10 + t * 80) * dpr;
       const alpha = (1 - t) * 0.5;
-      ctx.strokeStyle = `rgba(160, 210, 255, ${alpha})`;
+      ctx.strokeStyle = rgba(palette.accent, alpha);
       ctx.lineWidth = 2 * dpr;
       ctx.beginPath();
       ctx.arc(ripple.x * dpr, ripple.y * dpr, radius, 0, Math.PI * 2);
@@ -194,6 +214,12 @@
   onMount(() => {
     ctx = canvas.getContext('2d');
     reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    palette = {
+      accent: readRgb('--accent', palette.accent),
+      warning: readRgb('--warning', palette.warning),
+      text: readRgb('--text', palette.text),
+      muted: readRgb('--muted', palette.muted),
+    };
     measure();
 
     // Chrome Android fires its long-press haptic from the gesture recognizer,
@@ -272,7 +298,7 @@
     onpointerup={onPointerUp}
     onpointercancel={onPointerUp}
     oncontextmenu={(e) => e.preventDefault()}
-    aria-label="Digitofono playing surface. Tap or drag to play."
+    aria-label="digitofono playing surface. tap or drag to play."
   ></canvas>
 
   <div class="notes" aria-live="polite">
@@ -298,7 +324,7 @@
   .surface {
     position: fixed;
     inset: 0;
-    background: radial-gradient(circle at 50% 40%, #12161f 0%, #0b0d12 70%);
+    background: radial-gradient(circle at 50% 40%, var(--surface) 0%, var(--bg) 70%);
   }
 
   canvas {
@@ -320,16 +346,18 @@
     display: flex;
     gap: 0.75rem;
     pointer-events: none;
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    color: rgba(180, 215, 255, 0.75);
+    color: var(--text);
     font-size: 1rem;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
   }
 
   .note {
-    padding: 0.15rem 0.5rem;
-    border-radius: 0.4rem;
-    background: rgba(140, 200, 255, 0.08);
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
 
   .heard {
@@ -338,24 +366,25 @@
     left: 50%;
     transform: translateX(-50%);
     pointer-events: none;
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    font-size: 0.95rem;
-    letter-spacing: 0.05em;
+    font-size: 0.88rem;
+    letter-spacing: 0.04em;
   }
 
   .heard-note {
-    padding: 0.15rem 0.6rem;
-    border-radius: 0.4rem;
-    background: rgba(255, 220, 150, 0.12);
-    color: rgba(255, 230, 170, 0.95);
+    padding: 0.15rem 0.65rem;
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    color: var(--warning);
   }
 
-  .heard-idle,
-  .heard-error {
-    color: rgba(180, 215, 255, 0.6);
+  .heard-idle {
+    color: var(--muted);
   }
 
   .heard-error {
-    color: rgba(255, 180, 180, 0.85);
+    color: var(--danger);
   }
 </style>

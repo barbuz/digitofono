@@ -1,10 +1,12 @@
-# Digitofono
+# digitofono
 
 A streamlined touchscreen musical instrument. Tap or drag anywhere on a
 near-blank surface and it sings: the long axis sets a continuous pitch, and the
 short axis shapes the tone.
 
 Play it: https://barbuz.github.io/digitofono/
+
+Part of the [barbuz](https://barbuz.github.io) family of small tools.
 
 The design goals and full specification live in [SPEC.md](./SPEC.md).
 

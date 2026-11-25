@@ -15,7 +15,12 @@
   onclick={() => (panelOpen = true)}
   style="top: calc(env(safe-area-inset-top) + 0.75rem)"
 >
-  ⚙
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <path d="M4 7h16M4 12h16M4 17h16" />
+    <circle cx="9" cy="7" r="2.2" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="12" r="2.2" fill="currentColor" stroke="none" />
+    <circle cx="7" cy="17" r="2.2" fill="currentColor" stroke="none" />
+  </svg>
 </button>
 
 <SettingsPanel bind:open={panelOpen} settings={$settings} />
@@ -24,18 +29,34 @@
   .gear {
     position: fixed;
     right: calc(env(safe-area-inset-right) + 0.75rem);
-    width: 2.5rem;
-    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid var(--line);
     border-radius: 50%;
-    border: none;
-    background: rgba(140, 200, 255, 0.1);
-    color: rgba(180, 215, 255, 0.85);
-    font-size: 1.2rem;
-    cursor: pointer;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     z-index: 5;
+    transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  }
+
+  .gear svg {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .gear:hover {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .gear:active {
-    background: rgba(140, 200, 255, 0.2);
+    transform: scale(0.96);
   }
 </style>
