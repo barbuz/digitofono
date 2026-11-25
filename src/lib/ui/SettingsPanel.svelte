@@ -656,7 +656,7 @@
       <p class="about-links">
         <a class="about-barbuz" href="https://barbuz.github.io" aria-label="made by barbuz">
           <img class="about-barbuz-mark" src={barbuzMark} alt="" />
-          <span>made by <strong>arbuz</strong></span>
+          <span>made by <strong>barbuz</strong></span>
         </a>
         <span aria-hidden="true">·</span>
         <a href="https://github.com/barbuz/digitofono">source <span aria-hidden="true">↗</span></a>

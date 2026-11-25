@@ -1,17 +1,16 @@
-// Generates the PWA icons from the app mark: a pitch axis with a played node.
-// Hand-rolled rasterizer + PNG encoder, so the repo carries no image tooling.
+// Generates the PWA icons as PNGs with a tiny hand-rolled encoder, so the repo
+// carries no image tooling or binary assets authored by hand.
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public');
-mkdirSync(resolve(outDir, 'icons'), { recursive: true });
+const here = dirname(fileURLToPath(import.meta.url));
+const outDir = resolve(here, '..', 'public', 'icons');
+mkdirSync(outDir, { recursive: true });
 
-const BG = [10, 14, 23]; // #0a0e17
-const SURFACE = [17, 23, 38]; // #111726
-const INK = [231, 234, 242]; // #e7eaf2
-const ACCENT = [61, 123, 255]; // #3d7bff
+const BG = [11, 13, 18];
+const GLOW = [140, 200, 255];
 
 function crc32(buf) {
   let crc = ~0;
@@ -38,11 +37,12 @@ function encodePng(size, pixels) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 6;
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
   const raw = Buffer.alloc(size * (size * 4 + 1));
   for (let y = 0; y < size; y += 1) {
     const rowStart = y * (size * 4 + 1);
+    raw[rowStart] = 0; // filter: none
     for (let x = 0; x < size; x += 1) {
       const src = (y * size + x) * 4;
       const dst = rowStart + 1 + x * 4;
@@ -60,58 +60,26 @@ function encodePng(size, pixels) {
   ]);
 }
 
-function distanceToSegment(px, py, ax, ay, bx, by) {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-}
-
-function backgroundAt(x, y) {
-  const dist = Math.hypot(x - 0.5, y - 0.5);
-  let t = Math.max(0, Math.min(1, 1 - dist / 0.52));
-  t = t * t * (3 - 2 * t);
-  return [
-    Math.round(BG[0] + (SURFACE[0] - BG[0]) * t),
-    Math.round(BG[1] + (SURFACE[1] - BG[1]) * t),
-    Math.round(BG[2] + (SURFACE[2] - BG[2]) * t),
-  ];
-}
-
-// The mark in a 0..1 box, scaled about the centre for the maskable safe area.
-function sample(x, y, scale) {
-  const sx = 0.5 + (x - 0.5) / scale;
-  const sy = 0.5 + (y - 0.5) / scale;
-
-  const ringDist = Math.hypot(sx - 0.5, sy - 0.5);
-  if (ringDist <= 0.1328) {
-    return Math.abs(ringDist - 0.1016) <= 0.0273 ? ACCENT : backgroundAt(x, y);
-  }
-  if (distanceToSegment(sx, sy, 0.5, 0.14, 0.5, 0.86) <= 0.03125) return INK;
-  if (distanceToSegment(sx, sy, 0.375, 0.2656, 0.625, 0.2656) <= 0.0234) return INK;
-  if (distanceToSegment(sx, sy, 0.375, 0.7344, 0.625, 0.7344) <= 0.0234) return INK;
-  return backgroundAt(x, y);
-}
-
-function render(size, scale) {
+/** A glowing dot on a dark field: the instrument's single-gesture idea. */
+function render(size, padding) {
   const pixels = Buffer.alloc(size * size * 4);
-  const ss = 4;
+  const center = size / 2;
+  const inner = size * (0.5 - padding);
+  const outer = size * (0.5 - padding * 0.2);
+
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      const acc = [0, 0, 0];
-      for (let sy = 0; sy < ss; sy += 1) {
-        for (let sx = 0; sx < ss; sx += 1) {
-          const c = sample((x + (sx + 0.5) / ss) / size, (y + (sy + 0.5) / ss) / size, scale);
-          acc[0] += c[0];
-          acc[1] += c[1];
-          acc[2] += c[2];
-        }
+      const distance = Math.hypot(x + 0.5 - center, y + 0.5 - center);
+      let t = 0;
+      if (distance <= inner) {
+        t = 1;
+      } else if (distance <= outer) {
+        t = 1 - (distance - inner) / (outer - inner);
       }
-      const n = ss * ss;
       const i = (y * size + x) * 4;
-      pixels[i] = Math.round(acc[0] / n);
-      pixels[i + 1] = Math.round(acc[1] / n);
-      pixels[i + 2] = Math.round(acc[2] / n);
+      pixels[i] = Math.round(BG[0] + (GLOW[0] - BG[0]) * t);
+      pixels[i + 1] = Math.round(BG[1] + (GLOW[1] - BG[1]) * t);
+      pixels[i + 2] = Math.round(BG[2] + (GLOW[2] - BG[2]) * t);
       pixels[i + 3] = 255;
     }
   }
@@ -119,14 +87,14 @@ function render(size, scale) {
 }
 
 const targets = [
-  { dir: 'icons', file: 'icon-192.png', size: 192, scale: 1 },
-  { dir: 'icons', file: 'icon-512.png', size: 512, scale: 1 },
-  { dir: 'icons', file: 'icon-maskable-512.png', size: 512, scale: 0.82 },
-  { dir: '', file: 'apple-touch-icon.png', size: 180, scale: 1 },
+  { file: 'icon-192.png', size: 192, padding: 0.16 },
+  { file: 'icon-512.png', size: 512, padding: 0.16 },
+  { file: 'icon-maskable-512.png', size: 512, padding: 0.3 },
+  { file: 'apple-touch-icon.png', size: 180, padding: 0.16 },
 ];
 
-for (const { dir, file, size, scale } of targets) {
-  const png = encodePng(size, render(size, scale));
-  writeFileSync(resolve(outDir, dir, file), png);
-  console.log(`wrote ${dir ? `${dir}/` : ''}${file} (${size}x${size})`);
+for (const { file, size, padding } of targets) {
+  const png = encodePng(size, render(size, padding));
+  writeFileSync(resolve(outDir, file), png);
+  console.log(`wrote icons/${file} (${size}x${size})`);
 }
