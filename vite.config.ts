@@ -43,13 +43,13 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Digitofono',
-        short_name: 'Digitofono',
-        description: 'A streamlined touchscreen musical instrument.',
+        name: 'digitofono',
+        short_name: 'digitofono',
+        description: 'a touch instrument. tap or drag to play.',
         display: 'standalone',
         orientation: 'portrait',
-        theme_color: '#0b0d12',
-        background_color: '#0b0d12',
+        theme_color: '#0a0e17',
+        background_color: '#0a0e17',
         start_url: base,
         scope: base,
         icons: [

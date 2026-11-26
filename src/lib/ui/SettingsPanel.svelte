@@ -19,11 +19,14 @@
   } from '../state/userPresets';
   import { clearSongScale, setSongScale } from '../state/songScale';
   import { SongAnalyser } from '../input/songFile';
+  import AppMark from './AppMark.svelte';
   import { BUILD_INFO, formatBuildLabel } from '../version';
   import type { Settings, ToneState } from '../state/schema';
   import type { ScaleId } from '../mapping/scales';
   import type { HarmonyVoicing } from '../mapping/harmony';
   import type { SongScale } from '../mapping/songScale';
+
+  const barbuzMark = `${import.meta.env.BASE_URL}barbuz-mark.svg`;
 
   let {
     settings,
@@ -180,7 +183,11 @@
   <aside class="panel" aria-label="Settings">
     <header>
       <h2>Settings</h2>
-      <button class="close" onclick={() => (open = false)} aria-label="Close settings">✕</button>
+      <button class="close" onclick={() => (open = false)} aria-label="Close settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
     </header>
 
     <label>
@@ -641,9 +648,25 @@
 
     <button class="reset" onclick={resetSettings}>Reset to defaults</button>
 
-    <footer class="build">
-      <span>Build {formatBuildLabel(BUILD_INFO)}</span>
-      <button class="update" onclick={forceUpdate}>Force update</button>
+    <footer class="about">
+      <div class="about-brand">
+        <AppMark size={24} />
+        <span>digitofono</span>
+      </div>
+      <p class="about-links">
+        <a class="about-barbuz" href="https://barbuz.github.io" aria-label="made by barbuz">
+          <img class="about-barbuz-mark" src={barbuzMark} alt="" />
+          <span>made by <strong>barbuz</strong></span>
+        </a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/barbuz/digitofono">source <span aria-hidden="true">↗</span></a>
+        <span aria-hidden="true">·</span>
+        <a href="https://donate.stripe.com/9B6eVd1madcF8Dt8yp1gs00">leave a tip <span aria-hidden="true">↗</span></a>
+      </p>
+      <div class="build">
+        <span>Build {formatBuildLabel(BUILD_INFO)}</span>
+        <button class="update" onclick={forceUpdate}>Force update</button>
+      </div>
     </footer>
   </aside>
 {/if}
@@ -652,7 +675,9 @@
   .backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(6, 9, 15, 0.62);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     z-index: 10;
   }
 
@@ -665,10 +690,11 @@
     padding: 1.25rem;
     padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
     overflow-y: auto;
-    background: #151a24;
-    color: #dbe6f5;
+    background: var(--surface);
+    color: var(--text);
+    border-left: 1px solid var(--line);
+    box-shadow: var(--shadow);
     z-index: 11;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
     display: flex;
     flex-direction: column;
     gap: 0.9rem;
@@ -678,40 +704,61 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--line);
   }
 
   h2 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1.5rem;
   }
 
   h3 {
     margin: 0.35rem 0 -0.25rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    opacity: 0.65;
+    color: var(--muted);
   }
 
   .close {
-    background: none;
-    border: none;
-    color: inherit;
-    font-size: 1.2rem;
-    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--muted);
+    transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+
+  .close svg {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+
+  .close:hover {
+    border-color: var(--accent);
+    color: var(--text);
   }
 
   label {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
+    font-weight: 500;
   }
 
   .hint {
     font-size: 0.75rem;
-    opacity: 0.6;
+    font-weight: 400;
+    color: var(--muted);
   }
 
   .toggle-row {
@@ -721,6 +768,28 @@
   }
 
   .toggle-row input[type='checkbox'] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface-2);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+
+  .toggle-row input[type='checkbox']:checked {
+    border-color: var(--accent);
+    background-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-size: 80%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .axis-pick input[type='radio'] {
+    accent-color: var(--accent);
     width: 1rem;
     height: 1rem;
   }
@@ -730,27 +799,72 @@
     width: 100%;
   }
 
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 1.1rem;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  input[type='range']::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--muted) 30%, transparent);
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  input[type='range']::-moz-range-track {
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--muted) 30%, transparent);
+  }
+
+  input[type='range']::-moz-range-progress {
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+  }
+
+  input[type='range']::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
   select {
-    padding: 0.4rem;
-    border-radius: 0.4rem;
-    border: 1px solid #2b3646;
-    background: #1c2430;
-    color: inherit;
+    padding: 0.45rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--text);
   }
 
   .tone-row {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    padding: 0.55rem 0.6rem;
-    border-radius: 0.45rem;
-    border: 1px solid #2b3646;
-    background: #1a2230;
+    padding: 0.6rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
   }
 
   .tone-row.active {
-    border-color: #4a7fb5;
-    background: #1d2a3a;
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
   }
 
   .tone-head {
@@ -758,7 +872,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
 
   .axis-pick {
@@ -766,13 +880,9 @@
     flex-direction: row;
     align-items: center;
     gap: 0.3rem;
-    font-size: 0.75rem;
-    opacity: 0.8;
-  }
-
-  .axis-pick input[type='radio'] {
-    width: 1rem;
-    height: 1rem;
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: var(--muted);
   }
 
   .save-preset {
@@ -783,22 +893,33 @@
   .save-preset input {
     flex: 1;
     min-width: 0;
-    padding: 0.4rem;
-    border-radius: 0.4rem;
-    border: 1px solid #2b3646;
-    background: #1c2430;
-    color: inherit;
+    padding: 0.45rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--text);
   }
 
   .save-preset button,
-  .delete-preset {
-    padding: 0.4rem 0.6rem;
-    border-radius: 0.4rem;
-    border: 1px solid #2b3646;
-    background: #232d3b;
-    color: inherit;
+  .delete-preset,
+  .song-clear,
+  .update,
+  .reset {
+    padding: 0.42rem 0.65rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--text);
     font-size: 0.8rem;
-    cursor: pointer;
+    font-weight: 500;
+    transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+
+  .save-preset button:hover,
+  .song-clear:hover,
+  .update:hover,
+  .reset:hover {
+    border-color: var(--accent);
   }
 
   .save-preset button:disabled {
@@ -808,7 +929,8 @@
 
   .delete-preset {
     align-self: flex-start;
-    color: #ffb4b4;
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
   }
 
   .song {
@@ -816,9 +938,9 @@
     flex-direction: column;
     gap: 0.3rem;
     padding: 0.6rem;
-    border-radius: 0.4rem;
-    border: 1px solid #2b3646;
-    background: #1c2430;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
   }
 
   .song-head {
@@ -830,32 +952,97 @@
 
   .song-clear {
     align-self: flex-start;
-    padding: 0.3rem 0.6rem;
-    border-radius: 0.4rem;
-    border: 1px solid #2b3646;
-    background: #232d3b;
-    color: inherit;
-    font-size: 0.8rem;
-    cursor: pointer;
   }
 
   .error {
     font-size: 0.75rem;
-    color: #ff9c9c;
+    color: var(--danger);
   }
 
   input[type='file'] {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  input[type='file']::file-selector-button {
+    margin-right: 0.5rem;
+    padding: 0.42rem 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  input[type='file']::file-selector-button:hover {
+    border-color: var(--accent);
   }
 
   .reset {
+    color: var(--text);
+  }
+
+  .about {
     margin-top: auto;
-    padding: 0.5rem;
-    border-radius: 0.4rem;
-    border: 1px solid #2b3646;
-    background: #1c2430;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .about-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-weight: var(--font-display-weight);
+    font-size: 1.12rem;
+    letter-spacing: -0.02em;
+  }
+
+  .about-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    color: var(--muted);
+  }
+
+  .about-links a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color var(--dur-fast) var(--ease);
+  }
+
+  .about-links a:hover {
+    color: var(--accent);
+  }
+
+  .about-barbuz {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .about-barbuz-mark {
+    height: 1.05em;
+    width: auto;
+    display: block;
+  }
+
+  .about-barbuz strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .about-barbuz:hover strong {
     color: inherit;
-    cursor: pointer;
   }
 
   .build {
@@ -863,17 +1050,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    font-size: 0.75rem;
-    color: #7d8ea6;
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    color: var(--muted);
   }
 
   .update {
-    padding: 0.35rem 0.6rem;
-    border-radius: 0.4rem;
-    border: 1px solid #2b3646;
-    background: #1c2430;
-    color: inherit;
-    font-size: 0.75rem;
-    cursor: pointer;
+    font-size: 0.7rem;
   }
 </style>
