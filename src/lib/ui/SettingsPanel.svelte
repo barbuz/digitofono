@@ -20,6 +20,7 @@
   import { clearSongScale, setSongScale } from '../state/songScale';
   import { SongAnalyser } from '../input/songFile';
   import AppMark from './AppMark.svelte';
+  import ThemeToggle from './ThemeToggle.svelte';
   import { BUILD_INFO, formatBuildLabel } from '../version';
   import type { Settings, ToneState } from '../state/schema';
   import type { ScaleId } from '../mapping/scales';
@@ -189,6 +190,11 @@
         </svg>
       </button>
     </header>
+
+    <div class="theme-row">
+      <span>Theme</span>
+      <ThemeToggle />
+    </div>
 
     <label>
       Preset
@@ -711,6 +717,14 @@
   h2 {
     margin: 0;
     font-size: 1.5rem;
+  }
+
+  .theme-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.9rem;
   }
 
   h3 {

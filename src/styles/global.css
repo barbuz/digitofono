@@ -2,6 +2,13 @@
 
 :root {
   color-scheme: dark;
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-display-weight: 800;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 * {
