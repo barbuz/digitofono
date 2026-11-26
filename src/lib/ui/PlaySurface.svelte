@@ -7,6 +7,7 @@
   import type { ScaleSpec } from '../mapping/scales';
   import type { Settings } from '../state/schema';
   import type { SongScale } from '../mapping/songScale';
+  import { theme } from '../state/theme';
 
   let {
     settings,
@@ -39,6 +40,7 @@
   let rafId = 0;
   let dpr = 1;
   let reducedMotion = false;
+  let unsubTheme: (() => void) | undefined;
 
   type Rgb = [number, number, number];
   let palette = {
@@ -214,12 +216,15 @@
   onMount(() => {
     ctx = canvas.getContext('2d');
     reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    palette = {
-      accent: readRgb('--accent', palette.accent),
-      warning: readRgb('--warning', palette.warning),
-      text: readRgb('--text', palette.text),
-      muted: readRgb('--muted', palette.muted),
+    const refreshPalette = () => {
+      palette = {
+        accent: readRgb('--accent', palette.accent),
+        warning: readRgb('--warning', palette.warning),
+        text: readRgb('--text', palette.text),
+        muted: readRgb('--muted', palette.muted),
+      };
     };
+    unsubTheme = theme.subscribe(refreshPalette);
     measure();
 
     // Chrome Android fires its long-press haptic from the gesture recognizer,
@@ -244,6 +249,7 @@
     rafId = requestAnimationFrame(render);
 
     return () => {
+      unsubTheme?.();
       window.removeEventListener('resize', onResize);
       canvas.removeEventListener('touchstart', suppressLongPress);
       cancelAnimationFrame(rafId);

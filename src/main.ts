@@ -1,7 +1,10 @@
 import { mount } from 'svelte';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App.svelte';
+import { theme } from './lib/state/theme';
 import './styles/global.css';
+
+theme.init();
 
 // Registering through this virtual module is what wires up auto-update: it adds
 // the listener that reloads the page once a new service worker activates. The
