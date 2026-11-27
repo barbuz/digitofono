@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ATTACK_MAX,
   ATTACK_MIN,
+  AXIS_TARGETS,
   axisValueForPosition,
   FILTER_Q_MAX,
   FILTER_Q_MIN,
@@ -127,5 +128,13 @@ describe('short-axis target list', () => {
   it('keeps setup-only sliders out of the axis choices', () => {
     expect(SHORT_AXIS_IDS).not.toContain('octaveSpan');
     expect(SHORT_AXIS_IDS).not.toContain('scaleLines');
+  });
+
+  it('declares a usable slider extent for every target', () => {
+    for (const id of SHORT_AXIS_IDS) {
+      const target = AXIS_TARGETS[id];
+      expect(target.min).toBeLessThan(target.max);
+      expect(target.step).toBeGreaterThan(0);
+    }
   });
 });

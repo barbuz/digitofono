@@ -1,9 +1,10 @@
 import { clamp01 } from './pitch';
 
 /**
- * Every numeric settings slider can be the short-axis variable. The first four
- * are the tone controls that were always assignable; the rest extend the same
- * idea to the envelope, wave shape and global performance controls.
+ * The numeric performance sliders that can be the short-axis variable. The
+ * first four are the tone controls that were always assignable; the rest extend
+ * the same idea to the envelope, wave shape and global performance controls.
+ * Setup-only sliders such as octave span and scale-line opacity stay out.
  */
 export type ShortAxisId =
   | 'timbre'
@@ -50,8 +51,11 @@ export interface AxisTarget {
   id: ShortAxisId;
   label: string;
   field: AxisField;
+  /** Range written to `field`. */
   min: number;
   max: number;
+  /** Slider step; log targets render a normalized 0..1 slider. */
+  step: number;
   curve: 'linear' | 'log';
 }
 
@@ -95,6 +99,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.005,
   },
   harmonicMorph: {
     id: 'harmonicMorph',
@@ -103,6 +108,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.01,
   },
   harmony: {
     id: 'harmony',
@@ -111,6 +117,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.01,
   },
   volume: {
     id: 'volume',
@@ -119,6 +126,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.01,
   },
   filterQ: {
     id: 'filterQ',
@@ -127,6 +135,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: FILTER_Q_MIN,
     max: FILTER_Q_MAX,
     curve: 'linear',
+    step: 0.05,
   },
   attack: {
     id: 'attack',
@@ -135,6 +144,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: ATTACK_MIN,
     max: ATTACK_MAX,
     curve: 'log',
+    step: 0.001,
   },
   decay: {
     id: 'decay',
@@ -143,6 +153,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: DECAY_MIN,
     max: DECAY_MAX,
     curve: 'log',
+    step: 0.001,
   },
   sustain: {
     id: 'sustain',
@@ -151,6 +162,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.01,
   },
   release: {
     id: 'release',
@@ -159,6 +171,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: RELEASE_MIN,
     max: RELEASE_MAX,
     curve: 'log',
+    step: 0.001,
   },
   darkTilt: {
     id: 'darkTilt',
@@ -167,6 +180,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: TILT_MIN,
     max: TILT_MAX,
     curve: 'linear',
+    step: 0.05,
   },
   darkEven: {
     id: 'darkEven',
@@ -175,6 +189,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.01,
   },
   brightTilt: {
     id: 'brightTilt',
@@ -183,6 +198,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: TILT_MIN,
     max: TILT_MAX,
     curve: 'linear',
+    step: 0.05,
   },
   brightEven: {
     id: 'brightEven',
@@ -191,6 +207,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.01,
   },
   snapStrength: {
     id: 'snapStrength',
@@ -199,6 +216,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.05,
   },
   masterVolume: {
     id: 'masterVolume',
@@ -207,6 +225,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.02,
   },
   reverb: {
     id: 'reverb',
@@ -215,6 +234,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.02,
   },
   ensemble: {
     id: 'ensemble',
@@ -223,6 +243,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.05,
   },
   vibrato: {
     id: 'vibrato',
@@ -231,6 +252,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.05,
   },
 };
 

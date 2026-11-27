@@ -310,9 +310,10 @@ The first four mappings are the original tone controls (§7.1–7.4). The same
 mechanism also covers filter resonance, the envelope sliders, the four wave-shape
 sliders, and the performance controls (snap strength, master volume, reverb,
 ensemble and vibrato). Octave span and scale-line opacity are setup parameters
-for the playing surface, not axis targets. Each target declares its own range and
-curve in `mapping/shortAxis.ts`; time targets sweep logarithmically, matching
-their sliders.
+for the playing surface, not axis targets. Each target declares its own range,
+slider step and curve in `mapping/shortAxis.ts`; the settings panel reads those
+extents from the target rather than repeating them. Time targets sweep
+logarithmically, matching their sliders.
 
 Most targets follow the finger live. Attack, decay and sustain are sampled when
 the note starts (sustain can also be changed after the scheduled decay); release

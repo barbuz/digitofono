@@ -43,11 +43,13 @@ verified on a real device.
   forever.
 - Keep the default scale `chromatic` and the default short axis `timbre` unless
   the spec changes.
-- Every numeric settings slider is a short-axis target. `mapping/shortAxis.ts`
-  owns the list (`AXIS_TARGETS`), each target's range and linear/log curve, and
-  `resolveAxes` in `audio/params.ts` applies the selected one while every other
-  value stays stored. The four original ids (`timbre`, `harmonicMorph`,
-  `harmony`, `volume`) are kept because they are persisted; `volume` means the
+- Every numeric performance slider is a short-axis target. `mapping/shortAxis.ts`
+  owns the list (`AXIS_TARGETS`), each target's range, slider step and linear/log
+  curve, and `resolveAxes` in `audio/params.ts` applies the selected one while
+  every other value stays stored. `SettingsPanel` reads those extents from the
+  target instead of repeating them at each call site. The four original ids
+  (`timbre`, `harmonicMorph`, `harmony`, `volume`) are kept because they are
+  persisted; `volume` means the
   per-note level (`voiceLevel`), not master volume. Envelope targets are sampled
   at note start (release at lift); sustain also follows live after decay. Wave
   shape is per voice: `AudioEngine.wavesFor(shape)` returns cached wave pairs and

@@ -6,15 +6,12 @@
   import {
     ATTACK_MAX,
     ATTACK_MIN,
+    AXIS_TARGETS,
     DECAY_MAX,
     DECAY_MIN,
-    FILTER_Q_MAX,
-    FILTER_Q_MIN,
     RELEASE_MAX,
     RELEASE_MIN,
     SHORT_AXIS_LABELS,
-    TILT_MAX,
-    TILT_MIN,
     timbreHzForPosition,
     type ShortAxisId,
   } from '../mapping/shortAxis';
@@ -202,26 +199,25 @@
 
 {#snippet sliderRow(
   id: ShortAxisId,
-  title: string,
   value: number,
-  min: number,
-  max: number,
-  step: number,
   oninput: (event: Event & { currentTarget: HTMLInputElement }) => void,
   hint: string,
 )}
+  {@const target = AXIS_TARGETS[id]}
+  {@const uiMin = target.curve === 'log' ? 0 : target.min}
+  {@const uiMax = target.curve === 'log' ? 1 : target.max}
   <div class="tone-row" class:active={settings.shortAxis === id}>
     <div class="tone-head">
-      <span>{title}</span>
+      <span>{target.label}</span>
       {@render axisPicker(id)}
     </div>
     <input
       type="range"
-      {min}
-      {max}
-      {step}
+      min={uiMin}
+      max={uiMax}
+      step={target.step}
       {value}
-      aria-label={title}
+      aria-label={target.label}
       disabled={settings.shortAxis === id}
       {oninput}
     />
@@ -310,38 +306,30 @@
 
     {@render sliderRow(
       'timbre',
-      'Timbre (brightness)',
       settings.timbre,
-      0,
-      1,
-      0.005,
       (e) => setTone('timbre', Number(e.currentTarget.value)),
       `${Math.round(timbreHzForPosition(settings.timbre))} Hz`,
     )}
 
     {@render sliderRow(
       'harmonicMorph',
-      'Harmonic morph',
       settings.morph,
-      0,
-      1,
-      0.01,
       (e) => setTone('morph', Number(e.currentTarget.value)),
       `${Math.round(settings.morph * 100)}% bright`,
     )}
 
     <div class="tone-row" class:active={settings.shortAxis === 'harmony'}>
       <div class="tone-head">
-        <span>Harmony</span>
+        <span>{AXIS_TARGETS.harmony.label}</span>
         {@render axisPicker('harmony')}
       </div>
       <input
         type="range"
-        min="0"
-        max="1"
-        step="0.01"
+        min={AXIS_TARGETS.harmony.min}
+        max={AXIS_TARGETS.harmony.max}
+        step={AXIS_TARGETS.harmony.step}
         value={settings.harmony}
-        aria-label="Harmony"
+        aria-label={AXIS_TARGETS.harmony.label}
         disabled={settings.shortAxis === 'harmony'}
         oninput={(e) => setTone('harmony', Number(e.currentTarget.value))}
       />
@@ -365,116 +353,76 @@
 
     {@render sliderRow(
       'volume',
-      'Touch volume',
       settings.voiceLevel,
-      0,
-      1,
-      0.01,
       (e) => setTone('voiceLevel', Number(e.currentTarget.value)),
       `${Math.round(settings.voiceLevel * 100)}%`,
     )}
 
     {@render sliderRow(
       'filterQ',
-      `Filter resonance: ${settings.filterQ.toFixed(2)}`,
       settings.filterQ,
-      FILTER_Q_MIN,
-      FILTER_Q_MAX,
-      0.05,
       (e) => setTone('filterQ', Number(e.currentTarget.value)),
-      '',
+      `${settings.filterQ.toFixed(2)}`,
     )}
 
     <h3>Envelope</h3>
 
     {@render sliderRow(
       'attack',
-      `Attack: ${settings.attack.toFixed(3)} s`,
       timeToPos(settings.attack, ATTACK_MIN, ATTACK_MAX),
-      0,
-      1,
-      0.001,
       (e) => setTone('attack', posToTime(Number(e.currentTarget.value), ATTACK_MIN, ATTACK_MAX)),
-      '',
+      `${settings.attack.toFixed(3)} s`,
     )}
 
     {@render sliderRow(
       'decay',
-      `Decay: ${settings.decay.toFixed(3)} s`,
       timeToPos(settings.decay, DECAY_MIN, DECAY_MAX),
-      0,
-      1,
-      0.001,
       (e) => setTone('decay', posToTime(Number(e.currentTarget.value), DECAY_MIN, DECAY_MAX)),
-      '',
+      `${settings.decay.toFixed(3)} s`,
     )}
 
     {@render sliderRow(
       'sustain',
-      `Sustain: ${Math.round(settings.sustain * 100)}%`,
       settings.sustain,
-      0,
-      1,
-      0.01,
       (e) => setTone('sustain', Number(e.currentTarget.value)),
-      '',
+      `${Math.round(settings.sustain * 100)}%`,
     )}
 
     {@render sliderRow(
       'release',
-      `Release: ${settings.release.toFixed(3)} s`,
       timeToPos(settings.release, RELEASE_MIN, RELEASE_MAX),
-      0,
-      1,
-      0.001,
       (e) => setTone('release', posToTime(Number(e.currentTarget.value), RELEASE_MIN, RELEASE_MAX)),
-      '',
+      `${settings.release.toFixed(3)} s`,
     )}
 
     <h3>Wave shape</h3>
 
     {@render sliderRow(
       'darkTilt',
-      `Dark tilt: ${settings.darkTilt.toFixed(2)}`,
       settings.darkTilt,
-      TILT_MIN,
-      TILT_MAX,
-      0.05,
       (e) => setTone('darkTilt', Number(e.currentTarget.value)),
-      'higher rolls off the upper partials faster',
+      `${settings.darkTilt.toFixed(2)} · higher rolls off the upper partials faster`,
     )}
 
     {@render sliderRow(
       'darkEven',
-      `Dark even partials: ${Math.round(settings.darkEven * 100)}%`,
       settings.darkEven,
-      0,
-      1,
-      0.01,
       (e) => setTone('darkEven', Number(e.currentTarget.value)),
-      '0 = hollow/odd-only, 100% = all partials',
+      `${Math.round(settings.darkEven * 100)}% · 0 = hollow/odd-only, 100% = all partials`,
     )}
 
     {@render sliderRow(
       'brightTilt',
-      `Bright tilt: ${settings.brightTilt.toFixed(2)}`,
       settings.brightTilt,
-      TILT_MIN,
-      TILT_MAX,
-      0.05,
       (e) => setTone('brightTilt', Number(e.currentTarget.value)),
-      '',
+      `${settings.brightTilt.toFixed(2)}`,
     )}
 
     {@render sliderRow(
       'brightEven',
-      `Bright even partials: ${Math.round(settings.brightEven * 100)}%`,
       settings.brightEven,
-      0,
-      1,
-      0.01,
       (e) => setTone('brightEven', Number(e.currentTarget.value)),
-      '',
+      `${Math.round(settings.brightEven * 100)}%`,
     )}
 
     {#if song}
@@ -542,57 +490,37 @@
 
     {@render sliderRow(
       'snapStrength',
-      `Snap strength: ${settings.snapStrength.toFixed(2)}`,
       settings.snapStrength,
-      0,
-      1,
-      0.05,
       handleNumber('snapStrength'),
-      '0 = free glide; higher corrects small errors, still free between notes',
+      `${settings.snapStrength.toFixed(2)} · 0 = free glide; higher corrects small errors, still free between notes`,
     )}
 
     {@render sliderRow(
       'masterVolume',
-      `Master volume: ${Math.round(settings.volume * 100)}%`,
       settings.volume,
-      0,
-      1,
-      0.02,
       handleNumber('volume'),
-      '',
+      `${Math.round(settings.volume * 100)}%`,
     )}
 
     {@render sliderRow(
       'reverb',
-      `Reverb: ${Math.round(settings.reverbAmount * 100)}%`,
       settings.reverbAmount,
-      0,
-      1,
-      0.02,
       handleNumber('reverbAmount'),
-      '',
+      `${Math.round(settings.reverbAmount * 100)}%`,
     )}
 
     {@render sliderRow(
       'ensemble',
-      `Ensemble: ${Math.round(settings.ensemble * 100)}%`,
       settings.ensemble,
-      0,
-      1,
-      0.05,
       handleNumber('ensemble'),
-      'detuned chorus; blurs the pitch',
+      `${Math.round(settings.ensemble * 100)}% · detuned chorus; blurs the pitch`,
     )}
 
     {@render sliderRow(
       'vibrato',
-      `Vibrato: ${Math.round(settings.vibrato * 100)}%`,
       settings.vibrato,
-      0,
-      1,
-      0.05,
       handleNumber('vibrato'),
-      'pitch movement; softens tuning errors',
+      `${Math.round(settings.vibrato * 100)}% · pitch movement; softens tuning errors`,
     )}
 
     {@render plainSliderRow(
