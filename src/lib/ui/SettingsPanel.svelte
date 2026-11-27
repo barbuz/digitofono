@@ -3,7 +3,21 @@
   import { SCALE_IDS, SCALE_LABELS } from '../mapping/scales';
   import { HARMONY_VOICING_IDS, HARMONY_VOICING_LABELS } from '../mapping/harmony';
   import { NOTE_NAMES, midiToNoteName } from '../mapping/pitch';
-  import { timbreHzForPosition } from '../mapping/shortAxis';
+  import {
+    ATTACK_MAX,
+    ATTACK_MIN,
+    DECAY_MAX,
+    DECAY_MIN,
+    FILTER_Q_MAX,
+    FILTER_Q_MIN,
+    RELEASE_MAX,
+    RELEASE_MIN,
+    SHORT_AXIS_LABELS,
+    TILT_MAX,
+    TILT_MIN,
+    timbreHzForPosition,
+    type ShortAxisId,
+  } from '../mapping/shortAxis';
   import {
     applyPreset,
     resetSettings,
@@ -53,13 +67,6 @@
       ? 'custom'
       : settings.preset,
   );
-
-  const ATTACK_MIN = 0.005;
-  const ATTACK_MAX = 1;
-  const DECAY_MIN = 0.02;
-  const DECAY_MAX = 2;
-  const RELEASE_MIN = 0.02;
-  const RELEASE_MAX = 3;
 
   function timeToPos(value: number, min: number, max: number): number {
     const clamped = Math.max(min, Math.min(max, value));
@@ -179,6 +186,74 @@
   }
 </script>
 
+{#snippet axisPicker(id: ShortAxisId)}
+  <label class="axis-pick">
+    <input
+      type="radio"
+      name="shortAxis"
+      value={id}
+      checked={settings.shortAxis === id}
+      aria-label={`Use ${SHORT_AXIS_LABELS[id]} as the short axis`}
+      onchange={() => updateSettings({ shortAxis: id })}
+    />
+    Axis
+  </label>
+{/snippet}
+
+{#snippet sliderRow(
+  id: ShortAxisId,
+  title: string,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  oninput: (event: Event & { currentTarget: HTMLInputElement }) => void,
+  hint: string,
+)}
+  <div class="tone-row" class:active={settings.shortAxis === id}>
+    <div class="tone-head">
+      <span>{title}</span>
+      {@render axisPicker(id)}
+    </div>
+    <input
+      type="range"
+      {min}
+      {max}
+      {step}
+      {value}
+      aria-label={title}
+      disabled={settings.shortAxis === id}
+      {oninput}
+    />
+    {#if hint}
+      <span class="hint">{hint}</span>
+    {/if}
+    {#if settings.shortAxis === id}
+      <span class="hint">touch controls this</span>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet plainSliderRow(
+  title: string,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  oninput: (event: Event & { currentTarget: HTMLInputElement }) => void,
+  hint: string,
+)}
+  <div class="tone-row">
+    <div class="tone-head">
+      <span>{title}</span>
+    </div>
+    <input type="range" {min} {max} {step} {value} aria-label={title} {oninput} />
+    {#if hint}
+      <span class="hint">{hint}</span>
+    {/if}
+  </div>
+{/snippet}
+
 {#if open}
   <div class="backdrop" role="presentation" onclick={() => (open = false)}></div>
   <aside class="panel" aria-label="Settings">
@@ -233,77 +308,32 @@
 
     <h3>Tone</h3>
 
-    <div class="tone-row" class:active={settings.shortAxis === 'timbre'}>
-      <div class="tone-head">
-        <span>Timbre (brightness)</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="timbre"
-            checked={settings.shortAxis === 'timbre'}
-            onchange={() => updateSettings({ shortAxis: 'timbre' })}
-          />
-          Axis
-        </label>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.005"
-        value={settings.timbre}
-        disabled={settings.shortAxis === 'timbre'}
-        oninput={(e) => setTone('timbre', Number(e.currentTarget.value))}
-      />
-      <span class="hint">
-        {Math.round(timbreHzForPosition(settings.timbre))} Hz
-        {#if settings.shortAxis === 'timbre'} · touch controls this{/if}
-      </span>
-    </div>
+    {@render sliderRow(
+      'timbre',
+      'Timbre (brightness)',
+      settings.timbre,
+      0,
+      1,
+      0.005,
+      (e) => setTone('timbre', Number(e.currentTarget.value)),
+      `${Math.round(timbreHzForPosition(settings.timbre))} Hz`,
+    )}
 
-    <div class="tone-row" class:active={settings.shortAxis === 'harmonicMorph'}>
-      <div class="tone-head">
-        <span>Harmonic morph</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="harmonicMorph"
-            checked={settings.shortAxis === 'harmonicMorph'}
-            onchange={() => updateSettings({ shortAxis: 'harmonicMorph' })}
-          />
-          Axis
-        </label>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.morph}
-        disabled={settings.shortAxis === 'harmonicMorph'}
-        oninput={(e) => setTone('morph', Number(e.currentTarget.value))}
-      />
-      <span class="hint">
-        {Math.round(settings.morph * 100)}% bright
-        {#if settings.shortAxis === 'harmonicMorph'} · touch controls this{/if}
-      </span>
-    </div>
+    {@render sliderRow(
+      'harmonicMorph',
+      'Harmonic morph',
+      settings.morph,
+      0,
+      1,
+      0.01,
+      (e) => setTone('morph', Number(e.currentTarget.value)),
+      `${Math.round(settings.morph * 100)}% bright`,
+    )}
 
     <div class="tone-row" class:active={settings.shortAxis === 'harmony'}>
       <div class="tone-head">
         <span>Harmony</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="harmony"
-            checked={settings.shortAxis === 'harmony'}
-            onchange={() => updateSettings({ shortAxis: 'harmony' })}
-          />
-          Axis
-        </label>
+        {@render axisPicker('harmony')}
       </div>
       <input
         type="range"
@@ -311,6 +341,7 @@
         max="1"
         step="0.01"
         value={settings.harmony}
+        aria-label="Harmony"
         disabled={settings.shortAxis === 'harmony'}
         oninput={(e) => setTone('harmony', Number(e.currentTarget.value))}
       />
@@ -332,151 +363,119 @@
       </label>
     </div>
 
-    <div class="tone-row" class:active={settings.shortAxis === 'volume'}>
-      <div class="tone-head">
-        <span>Touch volume</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="volume"
-            checked={settings.shortAxis === 'volume'}
-            onchange={() => updateSettings({ shortAxis: 'volume' })}
-          />
-          Axis
-        </label>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.voiceLevel}
-        disabled={settings.shortAxis === 'volume'}
-        oninput={(e) => setTone('voiceLevel', Number(e.currentTarget.value))}
-      />
-      <span class="hint">
-        {Math.round(settings.voiceLevel * 100)}%
-        {#if settings.shortAxis === 'volume'} · touch controls this{/if}
-      </span>
-    </div>
+    {@render sliderRow(
+      'volume',
+      'Touch volume',
+      settings.voiceLevel,
+      0,
+      1,
+      0.01,
+      (e) => setTone('voiceLevel', Number(e.currentTarget.value)),
+      `${Math.round(settings.voiceLevel * 100)}%`,
+    )}
 
-    <label>
-      Filter resonance: {settings.filterQ.toFixed(2)}
-      <input
-        type="range"
-        min="0.3"
-        max="3"
-        step="0.05"
-        value={settings.filterQ}
-        oninput={(e) => setTone('filterQ', Number(e.currentTarget.value))}
-      />
-    </label>
+    {@render sliderRow(
+      'filterQ',
+      `Filter resonance: ${settings.filterQ.toFixed(2)}`,
+      settings.filterQ,
+      FILTER_Q_MIN,
+      FILTER_Q_MAX,
+      0.05,
+      (e) => setTone('filterQ', Number(e.currentTarget.value)),
+      '',
+    )}
 
     <h3>Envelope</h3>
 
-    <label>
-      Attack: {settings.attack.toFixed(3)} s
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.001"
-        value={timeToPos(settings.attack, ATTACK_MIN, ATTACK_MAX)}
-        oninput={(e) =>
-          setTone('attack', posToTime(Number(e.currentTarget.value), ATTACK_MIN, ATTACK_MAX))}
-      />
-    </label>
+    {@render sliderRow(
+      'attack',
+      `Attack: ${settings.attack.toFixed(3)} s`,
+      timeToPos(settings.attack, ATTACK_MIN, ATTACK_MAX),
+      0,
+      1,
+      0.001,
+      (e) => setTone('attack', posToTime(Number(e.currentTarget.value), ATTACK_MIN, ATTACK_MAX)),
+      '',
+    )}
 
-    <label>
-      Decay: {settings.decay.toFixed(3)} s
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.001"
-        value={timeToPos(settings.decay, DECAY_MIN, DECAY_MAX)}
-        oninput={(e) =>
-          setTone('decay', posToTime(Number(e.currentTarget.value), DECAY_MIN, DECAY_MAX))}
-      />
-    </label>
+    {@render sliderRow(
+      'decay',
+      `Decay: ${settings.decay.toFixed(3)} s`,
+      timeToPos(settings.decay, DECAY_MIN, DECAY_MAX),
+      0,
+      1,
+      0.001,
+      (e) => setTone('decay', posToTime(Number(e.currentTarget.value), DECAY_MIN, DECAY_MAX)),
+      '',
+    )}
 
-    <label>
-      Sustain: {Math.round(settings.sustain * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.sustain}
-        oninput={(e) => setTone('sustain', Number(e.currentTarget.value))}
-      />
-    </label>
+    {@render sliderRow(
+      'sustain',
+      `Sustain: ${Math.round(settings.sustain * 100)}%`,
+      settings.sustain,
+      0,
+      1,
+      0.01,
+      (e) => setTone('sustain', Number(e.currentTarget.value)),
+      '',
+    )}
 
-    <label>
-      Release: {settings.release.toFixed(3)} s
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.001"
-        value={timeToPos(settings.release, RELEASE_MIN, RELEASE_MAX)}
-        oninput={(e) =>
-          setTone('release', posToTime(Number(e.currentTarget.value), RELEASE_MIN, RELEASE_MAX))}
-      />
-    </label>
+    {@render sliderRow(
+      'release',
+      `Release: ${settings.release.toFixed(3)} s`,
+      timeToPos(settings.release, RELEASE_MIN, RELEASE_MAX),
+      0,
+      1,
+      0.001,
+      (e) => setTone('release', posToTime(Number(e.currentTarget.value), RELEASE_MIN, RELEASE_MAX)),
+      '',
+    )}
 
     <h3>Wave shape</h3>
 
-    <label>
-      Dark tilt: {settings.darkTilt.toFixed(2)}
-      <span class="hint">higher rolls off the upper partials faster</span>
-      <input
-        type="range"
-        min="0.3"
-        max="3"
-        step="0.05"
-        value={settings.darkTilt}
-        oninput={(e) => setTone('darkTilt', Number(e.currentTarget.value))}
-      />
-    </label>
+    {@render sliderRow(
+      'darkTilt',
+      `Dark tilt: ${settings.darkTilt.toFixed(2)}`,
+      settings.darkTilt,
+      TILT_MIN,
+      TILT_MAX,
+      0.05,
+      (e) => setTone('darkTilt', Number(e.currentTarget.value)),
+      'higher rolls off the upper partials faster',
+    )}
 
-    <label>
-      Dark even partials: {Math.round(settings.darkEven * 100)}%
-      <span class="hint">0 = hollow/odd-only, 100% = all partials</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.darkEven}
-        oninput={(e) => setTone('darkEven', Number(e.currentTarget.value))}
-      />
-    </label>
+    {@render sliderRow(
+      'darkEven',
+      `Dark even partials: ${Math.round(settings.darkEven * 100)}%`,
+      settings.darkEven,
+      0,
+      1,
+      0.01,
+      (e) => setTone('darkEven', Number(e.currentTarget.value)),
+      '0 = hollow/odd-only, 100% = all partials',
+    )}
 
-    <label>
-      Bright tilt: {settings.brightTilt.toFixed(2)}
-      <input
-        type="range"
-        min="0.3"
-        max="3"
-        step="0.05"
-        value={settings.brightTilt}
-        oninput={(e) => setTone('brightTilt', Number(e.currentTarget.value))}
-      />
-    </label>
+    {@render sliderRow(
+      'brightTilt',
+      `Bright tilt: ${settings.brightTilt.toFixed(2)}`,
+      settings.brightTilt,
+      TILT_MIN,
+      TILT_MAX,
+      0.05,
+      (e) => setTone('brightTilt', Number(e.currentTarget.value)),
+      '',
+    )}
 
-    <label>
-      Bright even partials: {Math.round(settings.brightEven * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.brightEven}
-        oninput={(e) => setTone('brightEven', Number(e.currentTarget.value))}
-      />
-    </label>
+    {@render sliderRow(
+      'brightEven',
+      `Bright even partials: ${Math.round(settings.brightEven * 100)}%`,
+      settings.brightEven,
+      0,
+      1,
+      0.01,
+      (e) => setTone('brightEven', Number(e.currentTarget.value)),
+      '',
+    )}
 
     {#if song}
       <div class="song">
@@ -529,93 +528,82 @@
       </select>
     </label>
 
-    <label>
-      Octaves: {settings.octaveSpan.toFixed(1)}
-      <input
-        type="range"
-        min="1"
-        max="5"
-        step="0.5"
-        value={settings.octaveSpan}
-        oninput={handleNumber('octaveSpan')}
-      />
-    </label>
+    <h3>Performance</h3>
 
-    <label>
-      Snap strength: {settings.snapStrength.toFixed(2)}
-      <span class="hint">0 = free glide; higher corrects small errors, still free between notes</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.snapStrength}
-        oninput={handleNumber('snapStrength')}
-      />
-    </label>
+    {@render plainSliderRow(
+      `Octaves: ${settings.octaveSpan.toFixed(1)}`,
+      settings.octaveSpan,
+      1,
+      5,
+      0.5,
+      handleNumber('octaveSpan'),
+      '',
+    )}
 
-    <label>
-      Master volume: {Math.round(settings.volume * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.02"
-        value={settings.volume}
-        oninput={handleNumber('volume')}
-      />
-    </label>
+    {@render sliderRow(
+      'snapStrength',
+      `Snap strength: ${settings.snapStrength.toFixed(2)}`,
+      settings.snapStrength,
+      0,
+      1,
+      0.05,
+      handleNumber('snapStrength'),
+      '0 = free glide; higher corrects small errors, still free between notes',
+    )}
 
-    <label>
-      Reverb: {Math.round(settings.reverbAmount * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.02"
-        value={settings.reverbAmount}
-        oninput={handleNumber('reverbAmount')}
-      />
-    </label>
+    {@render sliderRow(
+      'masterVolume',
+      `Master volume: ${Math.round(settings.volume * 100)}%`,
+      settings.volume,
+      0,
+      1,
+      0.02,
+      handleNumber('volume'),
+      '',
+    )}
 
-    <label>
-      Ensemble: {Math.round(settings.ensemble * 100)}%
-      <span class="hint">detuned chorus; blurs the pitch</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.ensemble}
-        oninput={handleNumber('ensemble')}
-      />
-    </label>
+    {@render sliderRow(
+      'reverb',
+      `Reverb: ${Math.round(settings.reverbAmount * 100)}%`,
+      settings.reverbAmount,
+      0,
+      1,
+      0.02,
+      handleNumber('reverbAmount'),
+      '',
+    )}
 
-    <label>
-      Vibrato: {Math.round(settings.vibrato * 100)}%
-      <span class="hint">pitch movement; softens tuning errors</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.vibrato}
-        oninput={handleNumber('vibrato')}
-      />
-    </label>
+    {@render sliderRow(
+      'ensemble',
+      `Ensemble: ${Math.round(settings.ensemble * 100)}%`,
+      settings.ensemble,
+      0,
+      1,
+      0.05,
+      handleNumber('ensemble'),
+      'detuned chorus; blurs the pitch',
+    )}
 
-    <label>
-      Scale lines: {Math.round(settings.scaleLines * 100)}%
-      <span class="hint">guide lines at each scale step; 0 hides them</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.scaleLines}
-        oninput={handleNumber('scaleLines')}
-      />
-    </label>
+    {@render sliderRow(
+      'vibrato',
+      `Vibrato: ${Math.round(settings.vibrato * 100)}%`,
+      settings.vibrato,
+      0,
+      1,
+      0.05,
+      handleNumber('vibrato'),
+      'pitch movement; softens tuning errors',
+    )}
+
+    {@render plainSliderRow(
+      `Scale lines: ${Math.round(settings.scaleLines * 100)}%`,
+      settings.scaleLines,
+      0,
+      1,
+      0.05,
+      handleNumber('scaleLines'),
+      'guide lines at each scale step; 0 hides them',
+    )}
 
     <label class="toggle">
       <span class="toggle-row">

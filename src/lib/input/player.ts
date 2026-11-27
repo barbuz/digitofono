@@ -1,6 +1,6 @@
 import { AudioEngine } from '../audio/AudioEngine';
 import { Voice } from '../audio/Voice';
-import { resolveAxes } from '../audio/params';
+import { resolveAxes, type AxisValues } from '../audio/params';
 import { positionToSnappedMidi, midiToFrequency, midiToNoteName } from '../mapping/pitch';
 import { harmonyMidiValues } from '../mapping/harmony';
 import { trackCutoffForPitch } from '../mapping/shortAxis';
@@ -35,6 +35,7 @@ interface TouchState {
   x: number;
   y: number;
   released: boolean;
+  axes: AxisValues;
 }
 
 export interface PlayerEvents {
@@ -113,21 +114,21 @@ export class Player {
     return { pitchPos, shortPos };
   }
 
-  private midiFor(pitchPos: number): number {
+  private midiFor(pitchPos: number, axes: AxisValues): number {
     return positionToSnappedMidi(
       pitchPos,
       { baseMidi: this.settings.baseMidi, octaveSpan: this.settings.octaveSpan },
       this.activeScale,
-      this.settings.snapStrength,
+      axes.snapStrength,
     );
   }
 
-  private frequencyFor(pitchPos: number): number {
-    return midiToFrequency(this.midiFor(pitchPos));
+  private frequencyFor(pitchPos: number, axes: AxisValues): number {
+    return midiToFrequency(this.midiFor(pitchPos, axes));
   }
 
-  private noteNameFor(pitchPos: number): string {
-    return midiToNoteName(this.midiFor(pitchPos));
+  private noteNameFor(pitchPos: number, axes: AxisValues): string {
+    return midiToNoteName(this.midiFor(pitchPos, axes));
   }
 
   /**
@@ -135,13 +136,15 @@ export class Player {
    * whenever any harmony level is positive, so a fixed harmony amount works
    * even when the short axis is something else.
    */
-  private harmonyRatiosFor(pitchPos: number, levels: number[]): number[] {
+  private harmonyRatiosFor(pitchPos: number, axes: AxisValues): number[] {
     // On the harmony axis the levels start at 0 at shortPos 0 but can rise as
     // the finger moves, so the graph must be built even when the initial levels
     // are silent. A fixed amount below the axis only needs the graph when it is
     // actually audible.
-    if (this.settings.shortAxis !== 'harmony' && !levels.some((level) => level > 0)) return [];
-    const rootMidi = this.midiFor(pitchPos);
+    if (this.settings.shortAxis !== 'harmony' && !axes.harmony.some((level) => level > 0)) {
+      return [];
+    }
+    const rootMidi = this.midiFor(pitchPos, axes);
     const rootHz = midiToFrequency(rootMidi);
     return harmonyMidiValues(rootMidi, this.activeScale, this.settings.harmonyVoicing).map(
       (midi) => midiToFrequency(midi) / rootHz,
@@ -157,10 +160,13 @@ export class Player {
 
     const { pitchPos, shortPos } = this.toAxes(x, y);
     const axes = resolveAxes(this.settings, shortPos);
-    const frequency = this.frequencyFor(pitchPos);
+    const frequency = this.frequencyFor(pitchPos, axes);
+    const waves = this.engine.wavesFor(axes.waveShape);
 
     const voice = this.engine.allocate();
-    if (!voice || !this.engine.currentWaveDark || !this.engine.currentWaveBright) return;
+    if (!voice || !waves) return;
+
+    this.applyAxisGlobals(axes);
 
     // The pool may have handed us a voice that another finger still holds
     // (voice stealing when polyphony is exhausted). Drop that stale touch so
@@ -170,20 +176,15 @@ export class Player {
     }
 
     voice.start({
-      envelope: {
-        attack: this.settings.attack,
-        decay: this.settings.decay,
-        sustain: this.settings.sustain,
-        release: this.settings.release,
-      },
-      filterQ: this.settings.filterQ,
-      waveDark: this.engine.currentWaveDark,
-      waveBright: this.engine.currentWaveBright,
+      envelope: axes.envelope,
+      filterQ: axes.filterQ,
+      waveDark: waves.dark,
+      waveBright: waves.bright,
       frequency,
       morph: axes.morph,
       cutoffHz: trackCutoffForPitch(axes.cutoffHz, frequency),
       level: axes.level,
-      harmonyRatios: this.harmonyRatiosFor(pitchPos, axes.harmony),
+      harmonyRatios: this.harmonyRatiosFor(pitchPos, axes),
       harmonyLevels: axes.harmony,
     });
 
@@ -195,6 +196,7 @@ export class Player {
       x,
       y,
       released: false,
+      axes,
     });
 
     this.events.onRipple?.(x, y);
@@ -207,18 +209,26 @@ export class Player {
 
     const { pitchPos, shortPos } = this.toAxes(x, y);
     const axes = resolveAxes(this.settings, shortPos);
-    const frequency = this.frequencyFor(pitchPos);
+    const frequency = this.frequencyFor(pitchPos, axes);
 
     state.voice.glideFrequency(frequency);
     state.voice.setMorph(axes.morph);
-    state.voice.setHarmony(this.harmonyRatiosFor(pitchPos, axes.harmony), axes.harmony);
+    state.voice.setHarmony(this.harmonyRatiosFor(pitchPos, axes), axes.harmony);
     state.voice.setCutoff(trackCutoffForPitch(axes.cutoffHz, frequency));
     state.voice.setLevel(axes.level);
+    state.voice.setFilterQ(axes.filterQ);
+    if (this.settings.shortAxis === 'sustain') {
+      state.voice.setSustain(axes.envelope.sustain);
+    }
+    const waves = this.engine.wavesFor(axes.waveShape);
+    if (waves) state.voice.setWaves(waves.dark, waves.bright);
+    this.applyAxisGlobals(axes);
 
     state.pitchPos = pitchPos;
     state.shortPos = shortPos;
     state.x = x;
     state.y = y;
+    state.axes = axes;
     this.emit();
   }
 
@@ -227,7 +237,7 @@ export class Player {
     if (!state) return;
 
     const heldMs = performance.now() - state.startTime;
-    state.voice.release(heldMs < TAP_MS);
+    state.voice.release(heldMs < TAP_MS, state.axes.envelope.release);
     this.touches.delete(pointerId);
     this.emit();
   }
@@ -242,11 +252,32 @@ export class Player {
         y: state.y,
         pitchPos: state.pitchPos,
         shortPos: state.shortPos,
-        noteName: this.noteNameFor(state.pitchPos),
+        noteName: this.noteNameFor(state.pitchPos, state.axes),
         held: performance.now() - state.startTime >= TAP_MS,
       });
     }
     this.events.onTouchChange(list);
+  }
+
+  /**
+   * Global targets are shared by every voice, so the most recent finger to move
+   * sets them. Per-voice targets never reach this method.
+   */
+  private applyAxisGlobals(axes: AxisValues): void {
+    switch (this.settings.shortAxis) {
+      case 'masterVolume':
+        this.engine.setMasterVolume(axes.masterVolume);
+        break;
+      case 'reverb':
+        this.engine.setReverbAmount(axes.reverbAmount);
+        break;
+      case 'ensemble':
+        this.engine.setEnsemble(axes.ensemble);
+        break;
+      case 'vibrato':
+        this.engine.setVibrato(axes.vibrato);
+        break;
+    }
   }
 }
 

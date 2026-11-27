@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { resolveAxes, TIMBRE_MIN_HZ, TIMBRE_MAX_HZ } from './params';
 import { DEFAULT_SETTINGS, type Settings } from '../state/schema';
 import { harmonyGains } from '../mapping/harmony';
-import { shortAxisToCutoff, shortAxisToGain } from '../mapping/shortAxis';
+import {
+  ATTACK_MAX,
+  ATTACK_MIN,
+  FILTER_Q_MAX,
+  FILTER_Q_MIN,
+  shortAxisToCutoff,
+  shortAxisToGain,
+} from '../mapping/shortAxis';
 
 function settingsWith(patch: Partial<Settings>): Settings {
   return { ...DEFAULT_SETTINGS, ...patch };
@@ -79,5 +86,58 @@ describe('resolveAxes', () => {
       const axes = resolveAxes(settingsWith({ shortAxis, harmony: 0 }), 1);
       expect(axes.harmony.every((gain) => gain === 0)).toBe(true);
     }
+  });
+});
+
+describe('resolveAxes generalized targets', () => {
+  it('sweeps filter resonance', () => {
+    const settings = settingsWith({ shortAxis: 'filterQ' });
+    expect(resolveAxes(settings, 0).filterQ).toBeCloseTo(FILTER_Q_MIN, 9);
+    expect(resolveAxes(settings, 1).filterQ).toBeCloseTo(FILTER_Q_MAX, 9);
+  });
+
+  it('resolves the envelope from the axis', () => {
+    const settings = settingsWith({ shortAxis: 'attack' });
+    expect(resolveAxes(settings, 0).envelope.attack).toBeCloseTo(ATTACK_MIN, 9);
+    expect(resolveAxes(settings, 1).envelope.attack).toBeCloseTo(ATTACK_MAX, 9);
+  });
+
+  it('resolves the wave shape from the axis', () => {
+    const settings = settingsWith({ shortAxis: 'darkTilt', darkTilt: 1.2 });
+    expect(resolveAxes(settings, 0).waveShape.darkTilt).toBeCloseTo(0.3, 9);
+    expect(resolveAxes(settings, 1).waveShape.darkTilt).toBeCloseTo(3, 9);
+  });
+
+  it('resolves global targets', () => {
+    const settings = settingsWith({
+      shortAxis: 'masterVolume',
+      snapStrength: 0.4,
+      volume: 0.3,
+      reverbAmount: 0.2,
+    });
+    const axes = resolveAxes(settings, 1);
+    expect(axes.masterVolume).toBeCloseTo(1, 9);
+    expect(axes.snapStrength).toBeCloseTo(0.4, 9);
+    expect(axes.reverbAmount).toBeCloseTo(0.2, 9);
+  });
+
+  it('leaves every other value at its stored setting', () => {
+    const settings = settingsWith({
+      shortAxis: 'masterVolume',
+      timbre: 0.4,
+      morph: 0.6,
+      voiceLevel: 0.8,
+      harmony: 0.3,
+      filterQ: 1.4,
+      attack: 0.2,
+    });
+    const axes = resolveAxes(settings, 0.5);
+    expect(axes.cutoffHz).toBeCloseTo(shortAxisToCutoff(0.4), 6);
+    expect(axes.morph).toBeCloseTo(0.6, 9);
+    expect(axes.level).toBeCloseTo(shortAxisToGain(0.8), 9);
+    expect(axes.harmony).toEqual(harmonyGains(0.3, 'diatonic'));
+    expect(axes.filterQ).toBeCloseTo(1.4, 9);
+    expect(axes.envelope.attack).toBeCloseTo(0.2, 9);
+    expect(axes.masterVolume).toBeCloseTo(0.5, 9);
   });
 });

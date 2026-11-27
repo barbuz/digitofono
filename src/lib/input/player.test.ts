@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { Player, TAP_MS, type SurfaceGeometry } from './player';
 import type { AudioEngine } from '../audio/AudioEngine';
 import { DEFAULT_SETTINGS, type Settings } from '../state/schema';
+import {
+  ATTACK_MAX,
+  ATTACK_MIN,
+  FILTER_Q_MAX,
+  FILTER_Q_MIN,
+  RELEASE_MAX,
+} from '../mapping/shortAxis';
 
 /**
  * Exercises the Player's touch bookkeeping - the layer where the "every second
@@ -14,16 +21,34 @@ class RecordingVoice {
   started = 0;
   lastFrequency = 0;
   releases: boolean[] = [];
+  releaseTimes: (number | undefined)[] = [];
+  lastFilterQ = 0;
+  lastEnvelope: { attack: number; decay: number; sustain: number; release: number } | null = null;
+  lastSustain: number | null = null;
+  lastWaves: unknown = null;
+  lastStartWaves: unknown = null;
   /** Params of the last `start`, so tests can assert what the Player built. */
-  lastParams: { harmonyRatios: number[]; harmonyLevels: number[] } | null = null;
+  lastParams: {
+    harmonyRatios: number[];
+    harmonyLevels: number[];
+    filterQ: number;
+    envelope: { attack: number; decay: number; sustain: number; release: number };
+  } | null = null;
 
   start(params: {
     frequency: number;
     harmonyRatios: number[];
     harmonyLevels: number[];
+    filterQ: number;
+    envelope: { attack: number; decay: number; sustain: number; release: number };
+    waveDark: unknown;
+    waveBright: unknown;
   }): void {
     this.started += 1;
     this.lastFrequency = params.frequency;
+    this.lastFilterQ = params.filterQ;
+    this.lastEnvelope = params.envelope;
+    this.lastStartWaves = { dark: params.waveDark, bright: params.waveBright };
     this.lastParams = params;
   }
 
@@ -32,14 +57,25 @@ class RecordingVoice {
   setHarmony(): void {}
   setCutoff(): void {}
   setLevel(): void {}
+  setFilterQ(q: number): void {
+    this.lastFilterQ = q;
+  }
+  setSustain(value: number): void {
+    this.lastSustain = value;
+  }
+  setWaves(dark: unknown, bright: unknown): void {
+    this.lastWaves = { dark, bright };
+  }
 
-  release(asPluck: boolean): void {
+  release(asPluck: boolean, releaseSeconds?: number): void {
     this.releases.push(asPluck);
+    this.releaseTimes.push(releaseSeconds);
   }
 }
 
 class RecordingEngine {
   voices: RecordingVoice[] = [];
+  masterVolumes: number[] = [];
   private pool: RecordingVoice[] = [];
 
   ensureRunning(): Promise<void> {
@@ -50,6 +86,7 @@ class RecordingEngine {
     const free = this.pool.find((v) => v.releases.length > 0);
     if (free) {
       free.releases = [];
+      free.releaseTimes = [];
       this.voices.push(free);
       return free;
     }
@@ -67,8 +104,14 @@ class RecordingEngine {
     return {};
   }
 
+  wavesFor(): { dark: unknown; bright: unknown } {
+    return { dark: {}, bright: {} };
+  }
+
   setWaveShape(): void {}
-  setMasterVolume(): void {}
+  setMasterVolume(value: number): void {
+    this.masterVolumes.push(value);
+  }
   setReverbAmount(): void {}
   setEnsemble(): void {}
   setVibrato(): void {}
@@ -264,5 +307,73 @@ describe('Player song scale', () => {
     player.pointerDown(1, 200, 400);
     expect(engine.voices[0].started).toBe(1);
     expect(engine.voices[0].lastFrequency).toBeGreaterThan(0);
+  });
+});
+
+describe('Player generalized axis wiring', () => {
+  function makeAxisPlayer(patch: Partial<Settings>) {
+    const engine = new RecordingEngine();
+    const axisSettings: Settings = { ...settings, ...patch };
+    const player = new Player(axisSettings, geometry, {}, engine as unknown as AudioEngine);
+    return { engine, player };
+  }
+
+  it('sweeps filter resonance with the short axis', () => {
+    const { engine, player } = makeAxisPlayer({ shortAxis: 'filterQ' });
+
+    player.pointerDown(1, 0, 400);
+    expect(engine.voices[0].lastFilterQ).toBeCloseTo(FILTER_Q_MIN, 9);
+
+    player.pointerDown(2, 400, 400);
+    expect(engine.voices[1].lastFilterQ).toBeCloseTo(FILTER_Q_MAX, 9);
+  });
+
+  it('samples attack from the axis position when the note starts', () => {
+    const { engine, player } = makeAxisPlayer({ shortAxis: 'attack' });
+
+    player.pointerDown(1, 0, 400);
+    expect(engine.voices[0].lastEnvelope!.attack).toBeCloseTo(ATTACK_MIN, 9);
+
+    player.pointerDown(2, 400, 400);
+    expect(engine.voices[1].lastEnvelope!.attack).toBeCloseTo(ATTACK_MAX, 9);
+  });
+
+  it('uses the release axis position at lift', () => {
+    const { engine, player } = makeAxisPlayer({ shortAxis: 'release' });
+
+    player.pointerDown(1, 400, 400);
+    // Make it a sustained release, not a pluck.
+    (player as unknown as { touches: Map<number, { startTime: number }> }).touches.get(1)!.startTime -=
+      TAP_MS + 500;
+    player.pointerUp(1);
+
+    expect(engine.voices[0].releaseTimes[0]).toBeCloseTo(RELEASE_MAX, 9);
+    expect(engine.voices[0].releases[0]).toBe(false);
+  });
+
+  it('applies a global axis value to the engine', () => {
+    const { engine, player } = makeAxisPlayer({ shortAxis: 'masterVolume' });
+    engine.masterVolumes.length = 0;
+
+    player.pointerDown(1, 400, 400);
+
+    expect(engine.masterVolumes.at(-1)).toBeCloseTo(1, 9);
+  });
+
+  it('drives sustain live once the note has passed its decay', () => {
+    const { engine, player } = makeAxisPlayer({ shortAxis: 'sustain', sustain: 0.5 });
+
+    player.pointerDown(1, 0, 400);
+    player.pointerMove(1, 400, 400);
+
+    expect(engine.voices[0].lastSustain).toBeCloseTo(1, 9);
+  });
+
+  it('passes per-voice waves resolved from the axis', () => {
+    const { engine, player } = makeAxisPlayer({ shortAxis: 'darkTilt' });
+
+    player.pointerDown(1, 0, 400);
+
+    expect(engine.voices[0].lastStartWaves).not.toBeNull();
   });
 });

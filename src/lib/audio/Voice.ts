@@ -72,6 +72,10 @@ export class Voice {
   private envelope: Envelope | null = null;
   /** The root note's current frequency, so harmony notes can be retuned to it. */
   private rootFrequency = 0;
+  /** When the scheduled decay ends; live sustain changes wait until then. */
+  private decayEnd = 0;
+  private waveDark: PeriodicWave | null = null;
+  private waveBright: PeriodicWave | null = null;
 
   private playing = false;
   private releasing = false;
@@ -126,10 +130,11 @@ export class Voice {
     }
 
     const attack = Math.max(MIN_ATTACK, params.envelope.attack);
+    this.decayEnd = now + attack + params.envelope.decay;
     env.gain.linearRampToValueAtTime(1, now + attack);
     env.gain.linearRampToValueAtTime(
       Math.max(EPS, params.envelope.sustain),
-      now + attack + params.envelope.decay,
+      this.decayEnd,
     );
 
     for (const note of this.notes) {
@@ -141,6 +146,8 @@ export class Voice {
     this.filter = filter;
     this.panner = panner;
     this.envelope = params.envelope;
+    this.waveDark = params.waveDark;
+    this.waveBright = params.waveBright;
     this.playing = true;
     this.releasing = false;
     this.freeAt = Number.POSITIVE_INFINITY;
@@ -238,18 +245,45 @@ export class Voice {
     this.level.gain.setTargetAtTime(clamp01(level), now, GLIDE_TAU);
   }
 
+  setFilterQ(q: number): void {
+    if (!this.filter) return;
+    const now = this.ctx.currentTime;
+    this.filter.Q.setTargetAtTime(Math.max(0.0001, q), now, GLIDE_TAU);
+  }
+
+  /** Swap the harmonic tables under a sounding note, for a live wave-shape axis. */
+  setWaves(waveDark: PeriodicWave, waveBright: PeriodicWave): void {
+    if (this.waveDark === waveDark && this.waveBright === waveBright) return;
+    this.waveDark = waveDark;
+    this.waveBright = waveBright;
+    for (const note of this.notes) {
+      note.oscDark.setPeriodicWave(waveDark);
+      note.oscBright.setPeriodicWave(waveBright);
+    }
+  }
+
+  /**
+   * Live sustain changes are only applied after the scheduled decay, so moving
+   * the axis during attack or decay does not interrupt the onset ramp.
+   */
+  setSustain(value: number): void {
+    if (!this.env || !this.playing || this.ctx.currentTime < this.decayEnd) return;
+    this.env.gain.setTargetAtTime(Math.max(EPS, value), this.ctx.currentTime, GLIDE_TAU);
+  }
+
   /**
    * Release the voice. `asPluck` lets a quick tap decay like a plucked note
    * instead of stopping as abruptly as a lifted sustained note.
+   * `releaseSeconds` lets the short axis override the stored release at lift.
    */
-  release(asPluck: boolean): void {
+  release(asPluck: boolean, releaseSeconds?: number): void {
     if (!this.playing || this.releasing) return;
     if (!this.env || this.notes.length === 0 || !this.envelope) return;
 
     const now = this.ctx.currentTime;
     const releaseTime = asPluck
       ? Math.max(this.envelope.decay, 0.25)
-      : Math.max(0.05, this.envelope.release);
+      : Math.max(0.05, releaseSeconds ?? this.envelope.release);
 
     this.env.gain.cancelScheduledValues(now);
     this.env.gain.setValueAtTime(Math.max(EPS, this.env.gain.value), now);
@@ -292,6 +326,8 @@ export class Voice {
     this.level = null;
     this.filter = null;
     this.panner = null;
+    this.waveDark = null;
+    this.waveBright = null;
   }
 }
 

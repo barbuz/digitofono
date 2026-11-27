@@ -37,7 +37,7 @@ iOS parity (Android + desktop browsers first; iOS is a stretch target).
 |---|----------|--------|
 | 1 | Interaction model | **Both**: quick tap = plucked note; press-and-hold = sustained gliding tone |
 | 2 | Pitch quantization | **Soft snap to scale**, strength adjustable 0.0–1.0 (0 = fully free glide) |
-| 3 | Short axis | **User-selectable** between *Timbre (brightness)*, *Harmonic morph*, *Harmony (chord)*, *Volume* |
+| 3 | Short axis | **User-selectable** between every numeric performance slider: the tone controls, envelope, wave shape, and snap strength, master volume, reverb, ensemble and vibrato. Octave span and scale-line opacity are setup-only, not axis targets |
 | 4 | Primary target | **Android Chrome** first; desktop browsers for development |
 | 5 | Visuals | Near-blank + **ripple/glow at each touch point** and a pitch indicator |
 | 6 | Rotation | **Locked at load** — no runtime orientation handling; **portrait** |
@@ -302,10 +302,22 @@ Concrete rules that keep it far from "sharp beeps":
 
 ## 7. Short-axis parameter
 
-A single setting `shortAxis` selects one of four mappings. Exactly one is active at
-a time. The other three use their own stored values, each adjustable independently
-in the settings, so a fixed amount of harmony or morph can sit under a swept
-parameter.
+A single setting `shortAxis` selects one of the numeric settings sliders. Exactly
+one is active at a time. Every other slider uses its own stored value, so a fixed
+harmony amount, filter resonance or envelope can sit under a swept parameter.
+
+The first four mappings are the original tone controls (§7.1–7.4). The same
+mechanism also covers filter resonance, the envelope sliders, the four wave-shape
+sliders, and the performance controls (snap strength, master volume, reverb,
+ensemble and vibrato). Octave span and scale-line opacity are setup parameters
+for the playing surface, not axis targets. Each target declares its own range and
+curve in `mapping/shortAxis.ts`; time targets sweep logarithmically, matching
+their sliders.
+
+Most targets follow the finger live. Attack, decay and sustain are sampled when
+the note starts (sustain can also be changed after the scheduled decay); release
+is sampled when the note is lifted. Wave-shape targets rebuild the voice's
+harmonic tables, so a held note can change timbre without restarting.
 
 ### 7.1 Timbre (brightness) — *default*
 
@@ -396,17 +408,23 @@ rests at is the level. Documented behaviour.
 
 ### 7.5 Non-selected parameters
 
-Every parameter has a stored value. When it is not the short axis, that value is
-used; when it is the axis, the finger's position overrides it. All four values can
-be non-default at once, so a fixed harmony amount or morph position can sit under a
+Every slider has a stored value. When it is not the short axis, that value is used;
+when it is the axis, the finger's position overrides it. Any combination can be
+non-default at once, so a fixed harmony amount or morph position can sit under a
 swept timbre.
 
 - Timbre → stored position on the 300–8000 Hz exponential cutoff curve.
 - Harmonic morph → stored crossfade, 0..1.
 - Harmony → stored chord amount, 0..1 (0 = bare note).
-- Volume → stored per-note level, 0..1 (separate from the master volume).
+- Touch volume → stored per-note level, 0..1 (separate from the master volume).
+- Filter resonance, envelope, and wave shape → their stored slider values.
+- Snap strength, master volume, reverb, ensemble and vibrato → their stored
+  slider values.
+- Octave span and scale-line opacity → setup-only; always use their stored
+  values and cannot be assigned to the axis.
 
-Editing any of these tone values sets the preset selection to `custom`.
+Editing any tone value (anything in `ToneState`) sets the preset selection to
+`custom`. Global performance values are not part of a preset snapshot.
 
 ---
 
@@ -587,14 +605,16 @@ Pure-function coverage is where real bugs hide:
   (A4=440, C4≈261.63).
 - `scales.ts`: each scale's pitch-class sets are correct.
 - `shortAxis.ts`: exponential timbre mapping monotonic; morph gains sum to 1;
-  volume curve monotonic.
+  volume curve monotonic; every axis target maps its declared range, with log
+  targets sweeping exponentially and all targets clamping.
 - `harmony.ts`: diatonic intervals snapped into every scale, `major`/`octaves`
   voicings scale-independent, stack strictly ascending for every voicing; fade-in
   silent at 0 and full at 1, monotonic per note.
 - `waves.ts`: parametric harmonic table (odd-only at even weight 0, all partials
   at 1, faster rolloff as tilt rises).
-- `params.ts`: stored tone values for non-axis parameters; the selected axis
-  overrides only its own value; fixed harmony produces chord gains.
+- `params.ts`: stored values for non-axis parameters; the selected axis overrides
+  only its own value; fixed harmony produces chord gains; filter, envelope, wave
+  shape, pitch and global targets resolve from the axis.
 - Settings persistence: older blobs hydrate tone values from their stored preset;
   editing a tone value sets the preset to `custom`; applying a preset copies every
   tone value.

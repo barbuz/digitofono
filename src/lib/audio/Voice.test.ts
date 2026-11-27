@@ -169,3 +169,48 @@ describe('Voice vibrato wiring', () => {
     expect(cuts).toHaveLength(2);
   });
 });
+
+describe('Voice live parameter setters', () => {
+  it('updates the filter resonance while sounding', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start(params);
+
+    voice.setFilterQ(2.4);
+
+    expect(ctx.filters[0].Q.value).toBeCloseTo(2.4, 9);
+  });
+
+  it('swaps the harmonic tables under every oscillator', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start({ ...params, harmonyRatios: [1.5], harmonyLevels: [0.5] });
+    const before = ctx.oscillators.map((o) => o.periodicWaves.length);
+
+    voice.setWaves({ tag: 'dark' } as unknown as PeriodicWave, { tag: 'bright' } as unknown as PeriodicWave);
+
+    expect(ctx.oscillators.map((o) => o.periodicWaves.length)).toEqual(
+      before.map((count) => count + 1),
+    );
+  });
+
+  it('ignores a repeated wave swap', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start(params);
+    const dark = { tag: 'dark' } as unknown as PeriodicWave;
+    const bright = { tag: 'bright' } as unknown as PeriodicWave;
+
+    voice.setWaves(dark, bright);
+    const counts = ctx.oscillators.map((o) => o.periodicWaves.length);
+    voice.setWaves(dark, bright);
+
+    expect(ctx.oscillators.map((o) => o.periodicWaves.length)).toEqual(counts);
+  });
+
+  it('accepts a release override from the axis', () => {
+    const { ctx, voice, params } = makeVoice();
+    voice.start(params);
+    voice.release(false, 2.5);
+
+    // releaseTime 2.5 + STOP_PADDING 0.03 + 0.02, against a 0.2 s default.
+    expect(voice.freeAt).toBeCloseTo(ctx.currentTime + 2.55, 9);
+  });
+});

@@ -48,10 +48,14 @@ export class FakeNode {
 export class FakeOscillator extends FakeNode {
   frequency = new FakeParam();
   detune = new FakeParam();
+  /** Every wave handed to `setPeriodicWave`, so tests can assert live swaps. */
+  readonly periodicWaves: unknown[] = [];
   private started = false;
   private stopped = false;
 
-  setPeriodicWave(): void {}
+  setPeriodicWave(wave: unknown): void {
+    this.periodicWaves.push(wave);
+  }
 
   start(): void {
     if (this.started) throw new Error('InvalidStateError: start called twice');
@@ -114,6 +118,8 @@ export class FakeAudioContext {
   destination = new FakeGain();
   /** Every oscillator this context has created, so tests can count voices. */
   readonly oscillators: FakeOscillator[] = [];
+  /** Every biquad filter this context has created. */
+  readonly filters: FakeFilter[] = [];
 
   createGain(): FakeGain {
     return new FakeGain();
@@ -126,7 +132,9 @@ export class FakeAudioContext {
   }
 
   createBiquadFilter(): FakeFilter {
-    return new FakeFilter();
+    const filter = new FakeFilter();
+    this.filters.push(filter);
+    return filter;
   }
 
   createStereoPanner(): FakePanner {

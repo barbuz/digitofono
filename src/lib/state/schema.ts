@@ -45,6 +45,9 @@ export interface Preset {
   values: ToneState;
 }
 
+/** The four harmonic-table controls a preset can set. */
+export type WaveShape = Pick<ToneState, 'darkTilt' | 'darkEven' | 'brightTilt' | 'brightEven'>;
+
 export interface UserPreset {
   id: UserPresetId;
   name: string;
