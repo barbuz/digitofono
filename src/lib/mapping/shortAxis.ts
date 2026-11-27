@@ -49,6 +49,8 @@ export type AxisField =
 export interface AxisTarget {
   id: ShortAxisId;
   label: string;
+  /** Plain-language help shown in the settings tooltip. */
+  description: string;
   field: AxisField;
   /** Range written to `field`. */
   min: number;
@@ -93,6 +95,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   timbre: {
     id: 'timbre',
     label: 'Timbre (brightness)',
+    description:
+      'Low-pass filter cutoff, 300 Hz to 8 kHz. Lower is darker and rounder; higher is brighter and more open.',
     field: 'timbre',
     min: 0,
     max: 1,
@@ -102,6 +106,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   harmonicMorph: {
     id: 'harmonicMorph',
     label: 'Harmonic morph',
+    description:
+      'Crossfades the dark and bright wave tables. 0% is the dark table, 100% the bright table; both sound in between.',
     field: 'morph',
     min: 0,
     max: 1,
@@ -111,6 +117,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   harmony: {
     id: 'harmony',
     label: 'Harmony (chord)',
+    description:
+      'Adds harmony notes above the root. 0 is the bare note; higher brings in the third, fifth and seventh. Harmony voicing chooses the intervals.',
     field: 'harmony',
     min: 0,
     max: 1,
@@ -120,6 +128,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   volume: {
     id: 'volume',
     label: 'Note level',
+    description:
+      'Per-note amplitude inside each voice, 0 to 100%. Saved with the tone preset; master volume is the separate overall output level.',
     field: 'voiceLevel',
     min: 0,
     max: 1,
@@ -129,6 +139,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   filterQ: {
     id: 'filterQ',
     label: 'Filter resonance',
+    description:
+      'Filter Q, 0.3 to 3.0. Higher values emphasize frequencies near the cutoff for a sharper, more nasal or whistling tone.',
     field: 'filterQ',
     min: FILTER_Q_MIN,
     max: FILTER_Q_MAX,
@@ -138,6 +150,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   attack: {
     id: 'attack',
     label: 'Attack',
+    description:
+      'Time to rise from silence to full level, 5 ms to 1 s. Sampled when the note starts.',
     field: 'attack',
     min: ATTACK_MIN,
     max: ATTACK_MAX,
@@ -147,6 +161,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   decay: {
     id: 'decay',
     label: 'Decay',
+    description:
+      'Time from the peak down to the sustain level, 20 ms to 2 s. Sampled when the note starts.',
     field: 'decay',
     min: DECAY_MIN,
     max: DECAY_MAX,
@@ -156,6 +172,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   sustain: {
     id: 'sustain',
     label: 'Sustain',
+    description:
+      'Level held while the finger stays down, 0 to 100%. Follows the finger live after decay.',
     field: 'sustain',
     min: 0,
     max: 1,
@@ -165,6 +183,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   release: {
     id: 'release',
     label: 'Release',
+    description:
+      'Fade-out time after lifting, 20 ms to 3 s. Sampled at lift.',
     field: 'release',
     min: RELEASE_MIN,
     max: RELEASE_MAX,
@@ -174,6 +194,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   darkTilt: {
     id: 'darkTilt',
     label: 'Dark tilt',
+    description:
+      'How fast the dark oscillator upper harmonics roll off, 0.3 to 3.0. Higher is darker.',
     field: 'darkTilt',
     min: TILT_MIN,
     max: TILT_MAX,
@@ -183,6 +205,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   darkEven: {
     id: 'darkEven',
     label: 'Dark even partials',
+    description:
+      'Even-harmonic content in the dark table. 0% is odd-only and hollow; 100% keeps every partial.',
     field: 'darkEven',
     min: 0,
     max: 1,
@@ -192,6 +216,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   brightTilt: {
     id: 'brightTilt',
     label: 'Bright tilt',
+    description:
+      'How fast the bright oscillator upper harmonics roll off, 0.3 to 3.0. Higher is darker.',
     field: 'brightTilt',
     min: TILT_MIN,
     max: TILT_MAX,
@@ -201,6 +227,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   brightEven: {
     id: 'brightEven',
     label: 'Bright even partials',
+    description:
+      'Even-harmonic content in the bright table. 0% is odd-only and hollow; 100% keeps every partial.',
     field: 'brightEven',
     min: 0,
     max: 1,
@@ -210,6 +238,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   snapStrength: {
     id: 'snapStrength',
     label: 'Snap strength',
+    description:
+      'How strongly pitch locks to the scale. 0 is free glide; higher corrects small errors; 1 lands on scale degrees.',
     field: 'snapStrength',
     min: 0,
     max: 1,
@@ -219,6 +249,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   reverb: {
     id: 'reverb',
     label: 'Reverb',
+    description:
+      'Amount of reverb/space, 0 to 100%.',
     field: 'reverbAmount',
     min: 0,
     max: 1,
@@ -228,6 +260,8 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   ensemble: {
     id: 'ensemble',
     label: 'Ensemble',
+    description:
+      'Amount of detuned chorus. Thickens the sound but can blur pitch.',
     field: 'ensemble',
     min: 0,
     max: 1,
@@ -237,10 +271,67 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   vibrato: {
     id: 'vibrato',
     label: 'Vibrato',
+    description:
+      'Depth of periodic pitch movement. Adds expression and can soften tuning errors.',
     field: 'vibrato',
     min: 0,
     max: 1,
     curve: 'linear',
+    step: 0.05,
+  },
+};
+
+export type SetupSliderId = 'octaveSpan' | 'masterVolume' | 'scaleLines';
+
+export interface SetupTarget {
+  id: SetupSliderId;
+  /** `Settings` field written by this slider. */
+  field: 'octaveSpan' | 'volume' | 'scaleLines';
+  label: string;
+  /** Plain-language help shown in the settings tooltip. */
+  description: string;
+  /** Always-visible hint under the slider, when there is one. */
+  hint: string;
+  min: number;
+  max: number;
+  step: number;
+}
+
+export const SETUP_SLIDER_IDS: SetupSliderId[] = ['octaveSpan', 'masterVolume', 'scaleLines'];
+
+/** Sliders that configure the instrument rather than a performance parameter. */
+export const SETUP_TARGETS: Record<SetupSliderId, SetupTarget> = {
+  octaveSpan: {
+    id: 'octaveSpan',
+    field: 'octaveSpan',
+    label: 'Octaves',
+    description:
+      'How many octaves the long axis spans, 1 to 5 in half-octave steps. Changes the pitch range, not the axis variable.',
+    hint: '',
+    min: 1,
+    max: 5,
+    step: 0.5,
+  },
+  masterVolume: {
+    id: 'masterVolume',
+    field: 'volume',
+    label: 'Master volume',
+    description:
+      'Final output level after all voices and effects, 0 to 100%. Not part of a tone preset.',
+    hint: 'overall output; not saved with presets',
+    min: 0,
+    max: 1,
+    step: 0.02,
+  },
+  scaleLines: {
+    id: 'scaleLines',
+    field: 'scaleLines',
+    label: 'Scale lines',
+    description:
+      'Opacity of the guide lines at each scale step, 0 to 100%. 0 hides them; purely visual.',
+    hint: 'guide lines at each scale step; 0 hides them',
+    min: 0,
+    max: 1,
     step: 0.05,
   },
 };

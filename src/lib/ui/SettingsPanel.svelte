@@ -11,8 +11,10 @@
     DECAY_MIN,
     RELEASE_MAX,
     RELEASE_MIN,
+    SETUP_TARGETS,
     SHORT_AXIS_LABELS,
     timbreHzForPosition,
+    type SetupSliderId,
     type ShortAxisId,
   } from '../mapping/shortAxis';
   import {
@@ -56,6 +58,7 @@
   let songError: string | null = $state(null);
   let presetName = $state('');
   let saveStatus: string | null = $state(null);
+  let openTip = $state<string | null>(null);
 
   const selectedPresetId = $derived(
     settings.preset === 'custom' ||
@@ -183,6 +186,35 @@
   }
 </script>
 
+{#snippet infoButton(id: string, label: string)}
+  <button
+    type="button"
+    class="info-button"
+    aria-label={`About ${label}`}
+    aria-expanded={openTip === id}
+    aria-controls={`tip-${id}`}
+    aria-describedby={openTip === id ? `tip-${id}` : undefined}
+    onclick={(event) => {
+      event.stopPropagation();
+      openTip = openTip === id ? null : id;
+    }}
+    onblur={() => {
+      if (openTip === id) openTip = null;
+    }}
+    onkeydown={(event) => {
+      if (event.key === 'Escape') openTip = null;
+    }}
+  >
+    i
+  </button>
+{/snippet}
+
+{#snippet tooltip(id: string, text: string)}
+  {#if openTip === id}
+    <span id={`tip-${id}`} class="tooltip" role="tooltip">{text}</span>
+  {/if}
+{/snippet}
+
 {#snippet axisPicker(id: ShortAxisId)}
   <label class="axis-pick">
     <input
@@ -208,9 +240,13 @@
   {@const uiMax = target.curve === 'log' ? 1 : target.max}
   <div class="tone-row" class:active={settings.shortAxis === id}>
     <div class="tone-head">
-      <span>{target.label}</span>
+      <div class="tone-title">
+        <span>{target.label}</span>
+        {@render infoButton(id, target.label)}
+      </div>
       {@render axisPicker(id)}
     </div>
+    {@render tooltip(id, target.description)}
     <input
       type="range"
       min={uiMin}
@@ -230,22 +266,27 @@
   </div>
 {/snippet}
 
-{#snippet plainSliderRow(
-  title: string,
-  value: number,
-  min: number,
-  max: number,
-  step: number,
-  oninput: (event: Event & { currentTarget: HTMLInputElement }) => void,
-  hint: string,
-)}
+{#snippet setupSliderRow(id: SetupSliderId, value: number, title: string)}
+  {@const target = SETUP_TARGETS[id]}
   <div class="tone-row">
     <div class="tone-head">
-      <span>{title}</span>
+      <div class="tone-title">
+        <span>{title}</span>
+        {@render infoButton(id, target.label)}
+      </div>
     </div>
-    <input type="range" {min} {max} {step} {value} aria-label={title} {oninput} />
-    {#if hint}
-      <span class="hint">{hint}</span>
+    {@render tooltip(id, target.description)}
+    <input
+      type="range"
+      min={target.min}
+      max={target.max}
+      step={target.step}
+      {value}
+      aria-label={target.label}
+      oninput={handleNumber(target.field)}
+    />
+    {#if target.hint}
+      <span class="hint">{target.hint}</span>
     {/if}
   </div>
 {/snippet}
@@ -311,18 +352,15 @@
       `${Math.round(timbreHzForPosition(settings.timbre))} Hz`,
     )}
 
-    {@render sliderRow(
-      'harmonicMorph',
-      settings.morph,
-      (e) => setTone('morph', Number(e.currentTarget.value)),
-      `${Math.round(settings.morph * 100)}% bright`,
-    )}
-
     <div class="tone-row" class:active={settings.shortAxis === 'harmony'}>
       <div class="tone-head">
-        <span>{AXIS_TARGETS.harmony.label}</span>
+        <div class="tone-title">
+          <span>{AXIS_TARGETS.harmony.label}</span>
+          {@render infoButton('harmony', AXIS_TARGETS.harmony.label)}
+        </div>
         {@render axisPicker('harmony')}
       </div>
+      {@render tooltip('harmony', AXIS_TARGETS.harmony.description)}
       <input
         type="range"
         min={AXIS_TARGETS.harmony.min}
@@ -338,7 +376,14 @@
         {#if settings.shortAxis === 'harmony'} · touch controls this{/if}
       </span>
       <label>
-        Harmony voicing
+        <span class="tone-title">
+          Harmony voicing
+          {@render infoButton('harmonyVoicing', 'Harmony voicing')}
+        </span>
+        {@render tooltip(
+          'harmonyVoicing',
+          'Diatonic snaps intervals to the current scale; major uses the intervals verbatim; octaves spreads octaves around the root.',
+        )}
         <select
           value={settings.harmonyVoicing}
           onchange={(e) =>
@@ -396,6 +441,18 @@
     )}
 
     <h3>Wave shape</h3>
+
+    <span class="hint">
+      Each note runs a dark and a bright oscillator. These sliders shape their
+      harmonic tables; Harmonic morph crossfades between them.
+    </span>
+
+    {@render sliderRow(
+      'harmonicMorph',
+      settings.morph,
+      (e) => setTone('morph', Number(e.currentTarget.value)),
+      `${Math.round(settings.morph * 100)}% bright`,
+    )}
 
     {@render sliderRow(
       'darkTilt',
@@ -478,31 +535,11 @@
 
     <h3>Performance</h3>
 
-    {@render plainSliderRow(
-      `Octaves: ${settings.octaveSpan.toFixed(1)}`,
-      settings.octaveSpan,
-      1,
-      5,
-      0.5,
-      handleNumber('octaveSpan'),
-      '',
-    )}
-
     {@render sliderRow(
       'snapStrength',
       settings.snapStrength,
       handleNumber('snapStrength'),
       `${settings.snapStrength.toFixed(2)} · 0 = free glide; higher corrects small errors, still free between notes`,
-    )}
-
-    {@render plainSliderRow(
-      `Master volume: ${Math.round(settings.volume * 100)}%`,
-      settings.volume,
-      0,
-      1,
-      0.02,
-      handleNumber('volume'),
-      'overall output; not saved with presets',
     )}
 
     {@render sliderRow(
@@ -526,14 +563,24 @@
       `${Math.round(settings.vibrato * 100)}% · pitch movement; softens tuning errors`,
     )}
 
-    {@render plainSliderRow(
-      `Scale lines: ${Math.round(settings.scaleLines * 100)}%`,
+    <h3>Global setup</h3>
+
+    {@render setupSliderRow(
+      'octaveSpan',
+      settings.octaveSpan,
+      `Octaves: ${settings.octaveSpan.toFixed(1)}`,
+    )}
+
+    {@render setupSliderRow(
+      'masterVolume',
+      settings.volume,
+      `Master volume: ${Math.round(settings.volume * 100)}%`,
+    )}
+
+    {@render setupSliderRow(
+      'scaleLines',
       settings.scaleLines,
-      0,
-      1,
-      0.05,
-      handleNumber('scaleLines'),
-      'guide lines at each scale step; 0 hides them',
+      `Scale lines: ${Math.round(settings.scaleLines * 100)}%`,
     )}
 
     <label class="toggle">
@@ -806,6 +853,51 @@
     justify-content: space-between;
     gap: 0.5rem;
     font-size: 0.88rem;
+  }
+
+  .tone-title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .info-button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-style: normal;
+    line-height: 1;
+    cursor: help;
+  }
+
+  .info-button:hover,
+  .info-button:focus-visible,
+  .info-button[aria-expanded='true'] {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .tooltip {
+    display: block;
+    padding: 0.45rem 0.55rem;
+    border-left: 2px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 400;
+    line-height: 1.35;
   }
 
   .axis-pick {

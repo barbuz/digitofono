@@ -8,6 +8,8 @@ import {
   FILTER_Q_MIN,
   RELEASE_MAX,
   RELEASE_MIN,
+  SETUP_SLIDER_IDS,
+  SETUP_TARGETS,
   SHORT_AXIS_IDS,
   shortAxisToCutoff,
   shortAxisToMorph,
@@ -127,15 +129,26 @@ describe('axisValueForPosition', () => {
 describe('short-axis target list', () => {
   it('keeps setup-only sliders out of the axis choices', () => {
     expect(SHORT_AXIS_IDS).not.toContain('masterVolume');
-    expect(SHORT_AXIS_IDS).not.toContain('octaveSpan');
-    expect(SHORT_AXIS_IDS).not.toContain('scaleLines');
+    for (const id of SETUP_SLIDER_IDS) {
+      expect(SHORT_AXIS_IDS as string[]).not.toContain(id);
+    }
   });
 
-  it('declares a usable slider extent for every target', () => {
+  it('declares a usable extent and help text for every axis target', () => {
     for (const id of SHORT_AXIS_IDS) {
       const target = AXIS_TARGETS[id];
       expect(target.min).toBeLessThan(target.max);
       expect(target.step).toBeGreaterThan(0);
+      expect(target.description.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('declares a usable extent and help text for every setup slider', () => {
+    for (const id of SETUP_SLIDER_IDS) {
+      const target = SETUP_TARGETS[id];
+      expect(target.min).toBeLessThan(target.max);
+      expect(target.step).toBeGreaterThan(0);
+      expect(target.description.length).toBeGreaterThan(0);
     }
   });
 });
