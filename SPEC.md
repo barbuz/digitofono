@@ -586,12 +586,12 @@ Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 `bell`, `pad` (slow attack), `pluck` (kalimba-ish).
 
 Settings panel: preset dropdown (built-ins plus saved presets, with a custom-save
-field), then **Global setup** first: scale, base note, octave span, master volume
-and scale-line opacity. The tone rows follow, with Harmony (chord) first and the
-default short axis. Filter resonance, the envelope sliders, and the performance
-controls (snap strength, reverb, ensemble, vibrato) come next. Wave shape is the
-last section: harmonic morph plus the dark/bright table sliders. Microphone
-listening and song scale import follow. Every slider has an info button that
+field), then **Global setup** first: scale, base note, song scale import,
+microphone listening, octave span, master volume and scale-line opacity. The
+tone rows follow, with Harmony (chord) first and the default short axis. Filter
+resonance, the envelope sliders, and the performance controls (snap strength,
+reverb, ensemble, vibrato) come next. Wave shape is the last section: harmonic
+morph plus the dark/bright table sliders. Every parameter has an info button that
 reveals a plain-language description.
 
 ---

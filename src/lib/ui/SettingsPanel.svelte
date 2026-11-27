@@ -369,6 +369,32 @@
       </select>
     </label>
 
+    <div class="tone-row">
+      <div class="tone-head">
+        <div class="tone-title">
+          <span>Learn the scale from a song</span>
+          {@render infoButton('songImport', 'Learn the scale from a song')}
+        </div>
+      </div>
+      {@render tooltip(
+        'songImport',
+        'Picks the notes an audio file uses and lays them out as frets. The file is analysed on this device and never uploaded.',
+      )}
+      <input
+        type="file"
+        accept="audio/*"
+        disabled={analysing}
+        aria-label="Learn the scale from a song"
+        onchange={onSongFile}
+      />
+      {#if analysing}
+        <span class="hint">Listening… {Math.round(progress * 100)}%</span>
+      {/if}
+      {#if songError}
+        <span class="error">{songError}</span>
+      {/if}
+    </div>
+
     {#if song}
       <div class="song">
         <div class="song-head">
@@ -395,6 +421,24 @@
         <button class="song-clear" onclick={clearSong}>Back to {SCALE_LABELS[settings.scale]}</button>
       </div>
     {/if}
+
+    <div class="tone-row">
+      <div class="tone-head">
+        <label class="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.listen}
+            onchange={(e) => updateSettings({ listen: e.currentTarget.checked })}
+          />
+          <span>Listen to microphone</span>
+        </label>
+        {@render infoButton('listen', 'Listen to microphone')}
+      </div>
+      {@render tooltip(
+        'listen',
+        'Highlights the pitch of music playing around the instrument. Needs microphone permission; audio is analysed on-device and never recorded.',
+      )}
+    </div>
 
     {@render setupSliderRow(
       'octaveSpan',
@@ -583,41 +627,6 @@
       `${Math.round(settings.brightEven * 100)}%`,
     )}
 
-    <label class="toggle">
-      <span class="toggle-row">
-        <input
-          type="checkbox"
-          checked={settings.listen}
-          onchange={(e) => updateSettings({ listen: e.currentTarget.checked })}
-        />
-        Listen to microphone
-      </span>
-      <span class="hint">
-        highlight the pitch of music playing around the instrument. Needs mic
-        permission; audio is analysed on-device and never recorded.
-      </span>
-    </label>
-
-    <label class="file">
-      Learn the scale from a song
-      <span class="hint">
-        picks the notes an audio file uses and lays them out as frets. The file
-        is analysed on this device and never uploaded.
-      </span>
-      <input
-        type="file"
-        accept="audio/*"
-        disabled={analysing}
-        onchange={onSongFile}
-      />
-      {#if analysing}
-        <span class="hint">Listening… {Math.round(progress * 100)}%</span>
-      {/if}
-      {#if songError}
-        <span class="error">{songError}</span>
-      {/if}
-    </label>
-
     <button class="reset" onclick={resetSettings}>Reset to defaults</button>
 
     <footer class="about">
@@ -743,6 +752,7 @@
 
   .toggle-row {
     display: flex;
+    flex-direction: row;
     align-items: center;
     gap: 0.5rem;
   }

@@ -50,8 +50,9 @@ verified on a real device.
   those extents from the target instead of repeating them at each call site.
   Setup-only sliders live under **Global setup** and use `SETUP_TARGETS` for
   their label, extent, step, hint and tooltip. Global setup is the first panel
-  section (scale and base note included); Tone starts with Harmony, the default
-  axis, and Wave shape is last. The four original ids (`timbre`,
+  section and holds scale, base note, song import, microphone listening and the
+  setup sliders; Tone starts with Harmony, the default axis, and Wave shape is
+  last. The four original ids (`timbre`,
   `harmonicMorph`, `harmony`, `volume`) are kept because they are persisted; the
   `volume` id means the per-note level (`voiceLevel`), not master volume.
   Envelope targets are sampled at note start (release at lift); sustain also
