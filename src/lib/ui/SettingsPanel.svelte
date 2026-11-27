@@ -3,7 +3,20 @@
   import { SCALE_IDS, SCALE_LABELS } from '../mapping/scales';
   import { HARMONY_VOICING_IDS, HARMONY_VOICING_LABELS } from '../mapping/harmony';
   import { NOTE_NAMES, midiToNoteName } from '../mapping/pitch';
-  import { timbreHzForPosition } from '../mapping/shortAxis';
+  import {
+    ATTACK_MAX,
+    ATTACK_MIN,
+    AXIS_TARGETS,
+    DECAY_MAX,
+    DECAY_MIN,
+    RELEASE_MAX,
+    RELEASE_MIN,
+    SETUP_TARGETS,
+    SHORT_AXIS_LABELS,
+    timbreHzForPosition,
+    type SetupSliderId,
+    type ShortAxisId,
+  } from '../mapping/shortAxis';
   import {
     applyPreset,
     resetSettings,
@@ -45,6 +58,7 @@
   let songError: string | null = $state(null);
   let presetName = $state('');
   let saveStatus: string | null = $state(null);
+  let openTip = $state<string | null>(null);
 
   const selectedPresetId = $derived(
     settings.preset === 'custom' ||
@@ -53,13 +67,6 @@
       ? 'custom'
       : settings.preset,
   );
-
-  const ATTACK_MIN = 0.005;
-  const ATTACK_MAX = 1;
-  const DECAY_MIN = 0.02;
-  const DECAY_MAX = 2;
-  const RELEASE_MIN = 0.02;
-  const RELEASE_MAX = 3;
 
   function timeToPos(value: number, min: number, max: number): number {
     const clamped = Math.max(min, Math.min(max, value));
@@ -179,6 +186,111 @@
   }
 </script>
 
+{#snippet infoButton(id: string, label: string)}
+  <button
+    type="button"
+    class="info-button"
+    aria-label={`About ${label}`}
+    aria-expanded={openTip === id}
+    aria-controls={`tip-${id}`}
+    aria-describedby={openTip === id ? `tip-${id}` : undefined}
+    onclick={(event) => {
+      event.stopPropagation();
+      openTip = openTip === id ? null : id;
+    }}
+    onblur={() => {
+      if (openTip === id) openTip = null;
+    }}
+    onkeydown={(event) => {
+      if (event.key === 'Escape') openTip = null;
+    }}
+  >
+    i
+  </button>
+{/snippet}
+
+{#snippet tooltip(id: string, text: string)}
+  {#if openTip === id}
+    <span id={`tip-${id}`} class="tooltip" role="tooltip">{text}</span>
+  {/if}
+{/snippet}
+
+{#snippet axisPicker(id: ShortAxisId)}
+  <label class="axis-pick">
+    <input
+      type="radio"
+      name="shortAxis"
+      value={id}
+      checked={settings.shortAxis === id}
+      aria-label={`Use ${SHORT_AXIS_LABELS[id]} as the short axis`}
+      onchange={() => updateSettings({ shortAxis: id })}
+    />
+    Axis
+  </label>
+{/snippet}
+
+{#snippet sliderRow(
+  id: ShortAxisId,
+  value: number,
+  oninput: (event: Event & { currentTarget: HTMLInputElement }) => void,
+  hint: string,
+)}
+  {@const target = AXIS_TARGETS[id]}
+  {@const uiMin = target.curve === 'log' ? 0 : target.min}
+  {@const uiMax = target.curve === 'log' ? 1 : target.max}
+  <div class="tone-row" class:active={settings.shortAxis === id}>
+    <div class="tone-head">
+      <div class="tone-title">
+        <span>{target.label}</span>
+        {@render infoButton(id, target.label)}
+      </div>
+      {@render axisPicker(id)}
+    </div>
+    {@render tooltip(id, target.description)}
+    <input
+      type="range"
+      min={uiMin}
+      max={uiMax}
+      step={target.step}
+      {value}
+      aria-label={target.label}
+      disabled={settings.shortAxis === id}
+      {oninput}
+    />
+    {#if hint}
+      <span class="hint">{hint}</span>
+    {/if}
+    {#if settings.shortAxis === id}
+      <span class="hint">touch controls this</span>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet setupSliderRow(id: SetupSliderId, value: number, title: string)}
+  {@const target = SETUP_TARGETS[id]}
+  <div class="tone-row">
+    <div class="tone-head">
+      <div class="tone-title">
+        <span>{title}</span>
+        {@render infoButton(id, target.label)}
+      </div>
+    </div>
+    {@render tooltip(id, target.description)}
+    <input
+      type="range"
+      min={target.min}
+      max={target.max}
+      step={target.step}
+      {value}
+      aria-label={target.label}
+      oninput={handleNumber(target.field)}
+    />
+    {#if target.hint}
+      <span class="hint">{target.hint}</span>
+    {/if}
+  </div>
+{/snippet}
+
 {#if open}
   <div class="backdrop" role="presentation" onclick={() => (open = false)}></div>
   <aside class="panel" aria-label="Settings">
@@ -231,252 +343,57 @@
       <span class="hint">{saveStatus}</span>
     {/if}
 
-    <h3>Tone</h3>
+    <h3>Global setup</h3>
 
-    <div class="tone-row" class:active={settings.shortAxis === 'timbre'}>
+    <label>
+      Scale
+      <select
+        value={settings.scale}
+        onchange={(e) => updateSettings({ scale: (e.currentTarget.value as ScaleId) })}
+      >
+        {#each SCALE_IDS as id}
+          <option value={id}>{SCALE_LABELS[id]}</option>
+        {/each}
+      </select>
+    </label>
+
+    <label>
+      Base note
+      <select
+        value={settings.baseMidi}
+        onchange={(e) => updateSettings({ baseMidi: Number(e.currentTarget.value) })}
+      >
+        {#each baseNoteOptions as option}
+          <option value={option.midi}>{option.label}</option>
+        {/each}
+      </select>
+    </label>
+
+    <div class="tone-row">
       <div class="tone-head">
-        <span>Timbre (brightness)</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="timbre"
-            checked={settings.shortAxis === 'timbre'}
-            onchange={() => updateSettings({ shortAxis: 'timbre' })}
-          />
-          Axis
-        </label>
+        <div class="tone-title">
+          <span>Learn the scale from a song</span>
+          {@render infoButton('songImport', 'Learn the scale from a song')}
+        </div>
       </div>
+      {@render tooltip(
+        'songImport',
+        'Picks the notes an audio file uses and lays them out as frets. The file is analysed on this device and never uploaded.',
+      )}
       <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.005"
-        value={settings.timbre}
-        disabled={settings.shortAxis === 'timbre'}
-        oninput={(e) => setTone('timbre', Number(e.currentTarget.value))}
+        type="file"
+        accept="audio/*"
+        disabled={analysing}
+        aria-label="Learn the scale from a song"
+        onchange={onSongFile}
       />
-      <span class="hint">
-        {Math.round(timbreHzForPosition(settings.timbre))} Hz
-        {#if settings.shortAxis === 'timbre'} · touch controls this{/if}
-      </span>
+      {#if analysing}
+        <span class="hint">Listening… {Math.round(progress * 100)}%</span>
+      {/if}
+      {#if songError}
+        <span class="error">{songError}</span>
+      {/if}
     </div>
-
-    <div class="tone-row" class:active={settings.shortAxis === 'harmonicMorph'}>
-      <div class="tone-head">
-        <span>Harmonic morph</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="harmonicMorph"
-            checked={settings.shortAxis === 'harmonicMorph'}
-            onchange={() => updateSettings({ shortAxis: 'harmonicMorph' })}
-          />
-          Axis
-        </label>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.morph}
-        disabled={settings.shortAxis === 'harmonicMorph'}
-        oninput={(e) => setTone('morph', Number(e.currentTarget.value))}
-      />
-      <span class="hint">
-        {Math.round(settings.morph * 100)}% bright
-        {#if settings.shortAxis === 'harmonicMorph'} · touch controls this{/if}
-      </span>
-    </div>
-
-    <div class="tone-row" class:active={settings.shortAxis === 'harmony'}>
-      <div class="tone-head">
-        <span>Harmony</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="harmony"
-            checked={settings.shortAxis === 'harmony'}
-            onchange={() => updateSettings({ shortAxis: 'harmony' })}
-          />
-          Axis
-        </label>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.harmony}
-        disabled={settings.shortAxis === 'harmony'}
-        oninput={(e) => setTone('harmony', Number(e.currentTarget.value))}
-      />
-      <span class="hint">
-        {settings.harmony === 0 ? 'off' : `${Math.round(settings.harmony * 100)}% chord`}
-        {#if settings.shortAxis === 'harmony'} · touch controls this{/if}
-      </span>
-      <label>
-        Harmony voicing
-        <select
-          value={settings.harmonyVoicing}
-          onchange={(e) =>
-            updateSettings({ harmonyVoicing: (e.currentTarget.value as HarmonyVoicing) })}
-        >
-          {#each HARMONY_VOICING_IDS as id}
-            <option value={id}>{HARMONY_VOICING_LABELS[id]}</option>
-          {/each}
-        </select>
-      </label>
-    </div>
-
-    <div class="tone-row" class:active={settings.shortAxis === 'volume'}>
-      <div class="tone-head">
-        <span>Touch volume</span>
-        <label class="axis-pick">
-          <input
-            type="radio"
-            name="shortAxis"
-            value="volume"
-            checked={settings.shortAxis === 'volume'}
-            onchange={() => updateSettings({ shortAxis: 'volume' })}
-          />
-          Axis
-        </label>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.voiceLevel}
-        disabled={settings.shortAxis === 'volume'}
-        oninput={(e) => setTone('voiceLevel', Number(e.currentTarget.value))}
-      />
-      <span class="hint">
-        {Math.round(settings.voiceLevel * 100)}%
-        {#if settings.shortAxis === 'volume'} · touch controls this{/if}
-      </span>
-    </div>
-
-    <label>
-      Filter resonance: {settings.filterQ.toFixed(2)}
-      <input
-        type="range"
-        min="0.3"
-        max="3"
-        step="0.05"
-        value={settings.filterQ}
-        oninput={(e) => setTone('filterQ', Number(e.currentTarget.value))}
-      />
-    </label>
-
-    <h3>Envelope</h3>
-
-    <label>
-      Attack: {settings.attack.toFixed(3)} s
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.001"
-        value={timeToPos(settings.attack, ATTACK_MIN, ATTACK_MAX)}
-        oninput={(e) =>
-          setTone('attack', posToTime(Number(e.currentTarget.value), ATTACK_MIN, ATTACK_MAX))}
-      />
-    </label>
-
-    <label>
-      Decay: {settings.decay.toFixed(3)} s
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.001"
-        value={timeToPos(settings.decay, DECAY_MIN, DECAY_MAX)}
-        oninput={(e) =>
-          setTone('decay', posToTime(Number(e.currentTarget.value), DECAY_MIN, DECAY_MAX))}
-      />
-    </label>
-
-    <label>
-      Sustain: {Math.round(settings.sustain * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.sustain}
-        oninput={(e) => setTone('sustain', Number(e.currentTarget.value))}
-      />
-    </label>
-
-    <label>
-      Release: {settings.release.toFixed(3)} s
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.001"
-        value={timeToPos(settings.release, RELEASE_MIN, RELEASE_MAX)}
-        oninput={(e) =>
-          setTone('release', posToTime(Number(e.currentTarget.value), RELEASE_MIN, RELEASE_MAX))}
-      />
-    </label>
-
-    <h3>Wave shape</h3>
-
-    <label>
-      Dark tilt: {settings.darkTilt.toFixed(2)}
-      <span class="hint">higher rolls off the upper partials faster</span>
-      <input
-        type="range"
-        min="0.3"
-        max="3"
-        step="0.05"
-        value={settings.darkTilt}
-        oninput={(e) => setTone('darkTilt', Number(e.currentTarget.value))}
-      />
-    </label>
-
-    <label>
-      Dark even partials: {Math.round(settings.darkEven * 100)}%
-      <span class="hint">0 = hollow/odd-only, 100% = all partials</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.darkEven}
-        oninput={(e) => setTone('darkEven', Number(e.currentTarget.value))}
-      />
-    </label>
-
-    <label>
-      Bright tilt: {settings.brightTilt.toFixed(2)}
-      <input
-        type="range"
-        min="0.3"
-        max="3"
-        step="0.05"
-        value={settings.brightTilt}
-        oninput={(e) => setTone('brightTilt', Number(e.currentTarget.value))}
-      />
-    </label>
-
-    <label>
-      Bright even partials: {Math.round(settings.brightEven * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={settings.brightEven}
-        oninput={(e) => setTone('brightEven', Number(e.currentTarget.value))}
-      />
-    </label>
 
     {#if song}
       <div class="song">
@@ -505,152 +422,210 @@
       </div>
     {/if}
 
-    <label>
-      Scale
-      <select
-        value={settings.scale}
-        onchange={(e) => updateSettings({ scale: (e.currentTarget.value as ScaleId) })}
-      >
-        {#each SCALE_IDS as id}
-          <option value={id}>{SCALE_LABELS[id]}</option>
-        {/each}
-      </select>
-    </label>
+    <div class="tone-row">
+      <div class="tone-head">
+        <label class="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.listen}
+            onchange={(e) => updateSettings({ listen: e.currentTarget.checked })}
+          />
+          <span>Listen to microphone</span>
+        </label>
+        {@render infoButton('listen', 'Listen to microphone')}
+      </div>
+      {@render tooltip(
+        'listen',
+        'Highlights the pitch of music playing around the instrument. Needs microphone permission; audio is analysed on-device and never recorded.',
+      )}
+    </div>
 
-    <label>
-      Base note
-      <select
-        value={settings.baseMidi}
-        onchange={(e) => updateSettings({ baseMidi: Number(e.currentTarget.value) })}
-      >
-        {#each baseNoteOptions as option}
-          <option value={option.midi}>{option.label}</option>
-        {/each}
-      </select>
-    </label>
+    {@render setupSliderRow(
+      'octaveSpan',
+      settings.octaveSpan,
+      `Octaves: ${settings.octaveSpan.toFixed(1)}`,
+    )}
 
-    <label>
-      Octaves: {settings.octaveSpan.toFixed(1)}
+    {@render setupSliderRow(
+      'masterVolume',
+      settings.volume,
+      `Master volume: ${Math.round(settings.volume * 100)}%`,
+    )}
+
+    {@render setupSliderRow(
+      'scaleLines',
+      settings.scaleLines,
+      `Scale lines: ${Math.round(settings.scaleLines * 100)}%`,
+    )}
+
+    <h3>Tone</h3>
+
+    <div class="tone-row" class:active={settings.shortAxis === 'harmony'}>
+      <div class="tone-head">
+        <div class="tone-title">
+          <span>{AXIS_TARGETS.harmony.label}</span>
+          {@render infoButton('harmony', AXIS_TARGETS.harmony.label)}
+        </div>
+        {@render axisPicker('harmony')}
+      </div>
+      {@render tooltip('harmony', AXIS_TARGETS.harmony.description)}
       <input
         type="range"
-        min="1"
-        max="5"
-        step="0.5"
-        value={settings.octaveSpan}
-        oninput={handleNumber('octaveSpan')}
+        min={AXIS_TARGETS.harmony.min}
+        max={AXIS_TARGETS.harmony.max}
+        step={AXIS_TARGETS.harmony.step}
+        value={settings.harmony}
+        aria-label={AXIS_TARGETS.harmony.label}
+        disabled={settings.shortAxis === 'harmony'}
+        oninput={(e) => setTone('harmony', Number(e.currentTarget.value))}
       />
-    </label>
-
-    <label>
-      Snap strength: {settings.snapStrength.toFixed(2)}
-      <span class="hint">0 = free glide; higher corrects small errors, still free between notes</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.snapStrength}
-        oninput={handleNumber('snapStrength')}
-      />
-    </label>
-
-    <label>
-      Master volume: {Math.round(settings.volume * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.02"
-        value={settings.volume}
-        oninput={handleNumber('volume')}
-      />
-    </label>
-
-    <label>
-      Reverb: {Math.round(settings.reverbAmount * 100)}%
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.02"
-        value={settings.reverbAmount}
-        oninput={handleNumber('reverbAmount')}
-      />
-    </label>
-
-    <label>
-      Ensemble: {Math.round(settings.ensemble * 100)}%
-      <span class="hint">detuned chorus; blurs the pitch</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.ensemble}
-        oninput={handleNumber('ensemble')}
-      />
-    </label>
-
-    <label>
-      Vibrato: {Math.round(settings.vibrato * 100)}%
-      <span class="hint">pitch movement; softens tuning errors</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.vibrato}
-        oninput={handleNumber('vibrato')}
-      />
-    </label>
-
-    <label>
-      Scale lines: {Math.round(settings.scaleLines * 100)}%
-      <span class="hint">guide lines at each scale step; 0 hides them</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        value={settings.scaleLines}
-        oninput={handleNumber('scaleLines')}
-      />
-    </label>
-
-    <label class="toggle">
-      <span class="toggle-row">
-        <input
-          type="checkbox"
-          checked={settings.listen}
-          onchange={(e) => updateSettings({ listen: e.currentTarget.checked })}
-        />
-        Listen to microphone
-      </span>
       <span class="hint">
-        highlight the pitch of music playing around the instrument. Needs mic
-        permission; audio is analysed on-device and never recorded.
+        {settings.harmony === 0 ? 'off' : `${Math.round(settings.harmony * 100)}% chord`}
+        {#if settings.shortAxis === 'harmony'} · touch controls this{/if}
       </span>
-    </label>
+      <label>
+        <span class="tone-title">
+          Harmony voicing
+          {@render infoButton('harmonyVoicing', 'Harmony voicing')}
+        </span>
+        {@render tooltip(
+          'harmonyVoicing',
+          'Diatonic snaps intervals to the current scale; major uses the intervals verbatim; octaves spreads octaves around the root.',
+        )}
+        <select
+          value={settings.harmonyVoicing}
+          onchange={(e) =>
+            updateSettings({ harmonyVoicing: (e.currentTarget.value as HarmonyVoicing) })}
+        >
+          {#each HARMONY_VOICING_IDS as id}
+            <option value={id}>{HARMONY_VOICING_LABELS[id]}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
 
-    <label class="file">
-      Learn the scale from a song
-      <span class="hint">
-        picks the notes an audio file uses and lays them out as frets. The file
-        is analysed on this device and never uploaded.
-      </span>
-      <input
-        type="file"
-        accept="audio/*"
-        disabled={analysing}
-        onchange={onSongFile}
-      />
-      {#if analysing}
-        <span class="hint">Listening… {Math.round(progress * 100)}%</span>
-      {/if}
-      {#if songError}
-        <span class="error">{songError}</span>
-      {/if}
-    </label>
+    {@render sliderRow(
+      'timbre',
+      settings.timbre,
+      (e) => setTone('timbre', Number(e.currentTarget.value)),
+      `${Math.round(timbreHzForPosition(settings.timbre))} Hz`,
+    )}
+
+    {@render sliderRow(
+      'volume',
+      settings.voiceLevel,
+      (e) => setTone('voiceLevel', Number(e.currentTarget.value)),
+      `${Math.round(settings.voiceLevel * 100)}% · per-note level; saved with the preset`,
+    )}
+
+    {@render sliderRow(
+      'filterQ',
+      settings.filterQ,
+      (e) => setTone('filterQ', Number(e.currentTarget.value)),
+      `${settings.filterQ.toFixed(2)}`,
+    )}
+
+    <h3>Envelope</h3>
+
+    {@render sliderRow(
+      'attack',
+      timeToPos(settings.attack, ATTACK_MIN, ATTACK_MAX),
+      (e) => setTone('attack', posToTime(Number(e.currentTarget.value), ATTACK_MIN, ATTACK_MAX)),
+      `${settings.attack.toFixed(3)} s`,
+    )}
+
+    {@render sliderRow(
+      'decay',
+      timeToPos(settings.decay, DECAY_MIN, DECAY_MAX),
+      (e) => setTone('decay', posToTime(Number(e.currentTarget.value), DECAY_MIN, DECAY_MAX)),
+      `${settings.decay.toFixed(3)} s`,
+    )}
+
+    {@render sliderRow(
+      'sustain',
+      settings.sustain,
+      (e) => setTone('sustain', Number(e.currentTarget.value)),
+      `${Math.round(settings.sustain * 100)}%`,
+    )}
+
+    {@render sliderRow(
+      'release',
+      timeToPos(settings.release, RELEASE_MIN, RELEASE_MAX),
+      (e) => setTone('release', posToTime(Number(e.currentTarget.value), RELEASE_MIN, RELEASE_MAX)),
+      `${settings.release.toFixed(3)} s`,
+    )}
+
+    <h3>Performance</h3>
+
+    {@render sliderRow(
+      'snapStrength',
+      settings.snapStrength,
+      handleNumber('snapStrength'),
+      `${settings.snapStrength.toFixed(2)} · 0 = free glide; higher corrects small errors, still free between notes`,
+    )}
+
+    {@render sliderRow(
+      'reverb',
+      settings.reverbAmount,
+      handleNumber('reverbAmount'),
+      `${Math.round(settings.reverbAmount * 100)}%`,
+    )}
+
+    {@render sliderRow(
+      'ensemble',
+      settings.ensemble,
+      handleNumber('ensemble'),
+      `${Math.round(settings.ensemble * 100)}% · detuned chorus; blurs the pitch`,
+    )}
+
+    {@render sliderRow(
+      'vibrato',
+      settings.vibrato,
+      handleNumber('vibrato'),
+      `${Math.round(settings.vibrato * 100)}% · pitch movement; softens tuning errors`,
+    )}
+
+    <h3>Wave shape</h3>
+
+    <span class="hint">
+      Each note runs a dark and a bright oscillator. These sliders shape their
+      harmonic tables; Harmonic morph crossfades between them.
+    </span>
+
+    {@render sliderRow(
+      'harmonicMorph',
+      settings.morph,
+      (e) => setTone('morph', Number(e.currentTarget.value)),
+      `${Math.round(settings.morph * 100)}% bright`,
+    )}
+
+    {@render sliderRow(
+      'darkTilt',
+      settings.darkTilt,
+      (e) => setTone('darkTilt', Number(e.currentTarget.value)),
+      `${settings.darkTilt.toFixed(2)} · higher rolls off the upper partials faster`,
+    )}
+
+    {@render sliderRow(
+      'darkEven',
+      settings.darkEven,
+      (e) => setTone('darkEven', Number(e.currentTarget.value)),
+      `${Math.round(settings.darkEven * 100)}% · 0 = hollow/odd-only, 100% = all partials`,
+    )}
+
+    {@render sliderRow(
+      'brightTilt',
+      settings.brightTilt,
+      (e) => setTone('brightTilt', Number(e.currentTarget.value)),
+      `${settings.brightTilt.toFixed(2)}`,
+    )}
+
+    {@render sliderRow(
+      'brightEven',
+      settings.brightEven,
+      (e) => setTone('brightEven', Number(e.currentTarget.value)),
+      `${Math.round(settings.brightEven * 100)}%`,
+    )}
 
     <button class="reset" onclick={resetSettings}>Reset to defaults</button>
 
@@ -777,6 +752,7 @@
 
   .toggle-row {
     display: flex;
+    flex-direction: row;
     align-items: center;
     gap: 0.5rem;
   }
@@ -887,6 +863,51 @@
     justify-content: space-between;
     gap: 0.5rem;
     font-size: 0.88rem;
+  }
+
+  .tone-title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .info-button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-style: normal;
+    line-height: 1;
+    cursor: help;
+  }
+
+  .info-button:hover,
+  .info-button:focus-visible,
+  .info-button[aria-expanded='true'] {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .tooltip {
+    display: block;
+    padding: 0.45rem 0.55rem;
+    border-left: 2px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 400;
+    line-height: 1.35;
   }
 
   .axis-pick {

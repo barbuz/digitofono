@@ -38,6 +38,6 @@ describe('songScale store', () => {
     // out of `Settings` is what lets this feature ship without a version bump
     // that would wipe every existing install's settings.
     expect('songScale' in DEFAULT_SETTINGS).toBe(false);
-    expect(SETTINGS_VERSION).toBe(2);
+    expect(SETTINGS_VERSION).toBe(3);
   });
 });

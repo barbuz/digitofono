@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ATTACK_MAX,
+  ATTACK_MIN,
+  AXIS_TARGETS,
+  axisValueForPosition,
+  FILTER_Q_MAX,
+  FILTER_Q_MIN,
+  RELEASE_MAX,
+  RELEASE_MIN,
+  SETUP_SLIDER_IDS,
+  SETUP_TARGETS,
+  SHORT_AXIS_IDS,
   shortAxisToCutoff,
   shortAxisToMorph,
   shortAxisToGain,
@@ -76,5 +87,68 @@ describe('timbrePositionForHz', () => {
   it('clamps to the sweep bounds', () => {
     expect(timbrePositionForHz(100)).toBe(0);
     expect(timbrePositionForHz(20000)).toBe(1);
+  });
+});
+
+describe('axisValueForPosition', () => {
+  it('interpolates linear targets', () => {
+    expect(axisValueForPosition('filterQ', 0)).toBeCloseTo(FILTER_Q_MIN, 9);
+    expect(axisValueForPosition('filterQ', 0.5)).toBeCloseTo(
+      (FILTER_Q_MIN + FILTER_Q_MAX) / 2,
+      9,
+    );
+    expect(axisValueForPosition('filterQ', 1)).toBeCloseTo(FILTER_Q_MAX, 9);
+  });
+
+  it('sweeps log targets exponentially', () => {
+    expect(axisValueForPosition('attack', 0)).toBeCloseTo(ATTACK_MIN, 9);
+    expect(axisValueForPosition('attack', 0.5)).toBeCloseTo(
+      Math.sqrt(ATTACK_MIN * ATTACK_MAX),
+      9,
+    );
+    expect(axisValueForPosition('attack', 1)).toBeCloseTo(ATTACK_MAX, 9);
+  });
+
+  it('covers every log target monotonically', () => {
+    for (const id of ['attack', 'decay', 'release'] as const) {
+      let previous = -Infinity;
+      for (let i = 0; i <= 20; i += 1) {
+        const value = axisValueForPosition(id, i / 20);
+        expect(value).toBeGreaterThanOrEqual(previous);
+        previous = value;
+      }
+    }
+  });
+
+  it('clamps out-of-range positions', () => {
+    expect(axisValueForPosition('release', -1)).toBeCloseTo(RELEASE_MIN, 9);
+    expect(axisValueForPosition('release', 2)).toBeCloseTo(RELEASE_MAX, 9);
+  });
+});
+
+describe('short-axis target list', () => {
+  it('keeps setup-only sliders out of the axis choices', () => {
+    expect(SHORT_AXIS_IDS).not.toContain('masterVolume');
+    for (const id of SETUP_SLIDER_IDS) {
+      expect(SHORT_AXIS_IDS as string[]).not.toContain(id);
+    }
+  });
+
+  it('declares a usable extent and help text for every axis target', () => {
+    for (const id of SHORT_AXIS_IDS) {
+      const target = AXIS_TARGETS[id];
+      expect(target.min).toBeLessThan(target.max);
+      expect(target.step).toBeGreaterThan(0);
+      expect(target.description.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('declares a usable extent and help text for every setup slider', () => {
+    for (const id of SETUP_SLIDER_IDS) {
+      const target = SETUP_TARGETS[id];
+      expect(target.min).toBeLessThan(target.max);
+      expect(target.step).toBeGreaterThan(0);
+      expect(target.description.length).toBeGreaterThan(0);
+    }
   });
 });

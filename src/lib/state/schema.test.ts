@@ -12,6 +12,7 @@ describe('default settings', () => {
     expect(DEFAULT_SETTINGS.ensemble).toBe(0.75);
     expect(DEFAULT_SETTINGS.snapStrength).toBe(0.2);
     expect(DEFAULT_SETTINGS.scaleLines).toBe(0.5);
+    expect(DEFAULT_SETTINGS.shortAxis).toBe('harmony');
   });
 
   it('has no polyphony setting, since the voice cap is fixed', () => {

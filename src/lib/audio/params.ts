@@ -1,4 +1,6 @@
 import {
+  AXIS_TARGETS,
+  axisValueForPosition,
   shortAxisToCutoff,
   shortAxisToGain,
   shortAxisToMorph,
@@ -6,7 +8,7 @@ import {
   TIMBRE_MIN_HZ,
 } from '../mapping/shortAxis';
 import { harmonyGains, MAX_HARMONY_NOTES } from '../mapping/harmony';
-import type { Settings } from '../state/schema';
+import type { Envelope, Settings, WaveShape } from '../state/schema';
 
 export { TIMBRE_MAX_HZ, TIMBRE_MIN_HZ };
 
@@ -18,23 +20,57 @@ export interface AxisValues {
   level: number;
   /** Level of each harmony note, parallel to `HARMONY_INTERVALS_SEMITONES`. */
   harmony: number[];
+  filterQ: number;
+  envelope: Envelope;
+  waveShape: WaveShape;
+  snapStrength: number;
+  reverbAmount: number;
+  ensemble: number;
+  vibrato: number;
 }
 
 /**
  * Resolve the continuous voice parameters from the short-axis position.
- * Only the selected short axis follows the finger; every other parameter uses
- * its stored value, so all four can be tuned independently.
+ * The selected axis overrides its own stored value; every other parameter keeps
+ * its stored value, so any slider can be swept while the rest stay fixed.
+ *
+ * Envelope fields are sampled when the note starts (and `release` when it
+ * ends), because attack, decay and sustain describe an onset rather than a
+ * continuously variable sound. The remaining targets follow the finger live.
  */
 export function resolveAxes(settings: Settings, shortPos: number): AxisValues {
-  const timbre = settings.shortAxis === 'timbre' ? shortPos : settings.timbre;
-  const morph = settings.shortAxis === 'harmonicMorph' ? shortPos : settings.morph;
-  const harmony = settings.shortAxis === 'harmony' ? shortPos : settings.harmony;
-  const level = settings.shortAxis === 'volume' ? shortPos : settings.voiceLevel;
+  const target = AXIS_TARGETS[settings.shortAxis];
+  const resolved = {
+    ...settings,
+    [target.field]: axisValueForPosition(settings.shortAxis, shortPos),
+  } as Settings;
+
+  const harmony =
+    resolved.harmony === 0
+      ? NO_HARMONY
+      : harmonyGains(resolved.harmony, resolved.harmonyVoicing);
 
   return {
-    cutoffHz: shortAxisToCutoff(timbre, { minHz: TIMBRE_MIN_HZ, maxHz: TIMBRE_MAX_HZ }),
-    morph: shortAxisToMorph(morph).brightGain,
-    harmony: harmony === 0 ? NO_HARMONY : harmonyGains(harmony, settings.harmonyVoicing),
-    level: shortAxisToGain(level),
+    cutoffHz: shortAxisToCutoff(resolved.timbre, { minHz: TIMBRE_MIN_HZ, maxHz: TIMBRE_MAX_HZ }),
+    morph: shortAxisToMorph(resolved.morph).brightGain,
+    level: shortAxisToGain(resolved.voiceLevel),
+    harmony,
+    filterQ: resolved.filterQ,
+    envelope: {
+      attack: resolved.attack,
+      decay: resolved.decay,
+      sustain: resolved.sustain,
+      release: resolved.release,
+    },
+    waveShape: {
+      darkTilt: resolved.darkTilt,
+      darkEven: resolved.darkEven,
+      brightTilt: resolved.brightTilt,
+      brightEven: resolved.brightEven,
+    },
+    snapStrength: resolved.snapStrength,
+    reverbAmount: resolved.reverbAmount,
+    ensemble: resolved.ensemble,
+    vibrato: resolved.vibrato,
   };
 }

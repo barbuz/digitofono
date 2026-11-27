@@ -41,8 +41,30 @@ verified on a real device.
   touch is registered before a fast `pointerup` can arrive. Awaiting the context
   here reintroduces a bug where the first tap is lost and its voice sounds
   forever.
-- Keep the default scale `chromatic` and the default short axis `timbre` unless
+- Keep the default scale `chromatic` and the default short axis `harmony` unless
   the spec changes.
+- Every numeric performance slider is a short-axis target. `mapping/shortAxis.ts`
+  owns the list (`AXIS_TARGETS`), each target's range, slider step, linear/log
+  curve and tooltip description, and `resolveAxes` in `audio/params.ts` applies
+  the selected one while every other value stays stored. `SettingsPanel` reads
+  those extents from the target instead of repeating them at each call site.
+  Setup-only sliders live under **Global setup** and use `SETUP_TARGETS` for
+  their label, extent, step, hint and tooltip. Global setup is the first panel
+  section and holds scale, base note, song import, microphone listening and the
+  setup sliders; Tone starts with Harmony, the default axis, and Wave shape is
+  last. The four original ids (`timbre`,
+  `harmonicMorph`, `harmony`, `volume`) are kept because they are persisted; the
+  `volume` id means the per-note level (`voiceLevel`), not master volume.
+  Envelope targets are sampled at note start (release at lift); sustain also
+  follows live after decay. Wave shape is per voice: `AudioEngine.wavesFor(shape)`
+  returns cached wave pairs and `Voice.setWaves` swaps them under a held note.
+  Harmonic morph belongs in the Wave shape group because it is the crossfade
+  between the dark and bright tables. Global targets (reverb, ensemble, vibrato)
+  are last-touch-wins; `snapStrength` is applied per touch. Master volume, octave
+  span and scale-line opacity are setup parameters, not axis targets: keep them
+  out of `SHORT_AXIS_IDS`, apply master volume from stored settings in
+  `Player.applySettings`, and always read octave span and scale-line opacity from
+  stored settings in `PlaySurface`. Do not reintroduce a fixed four-value union.
 - Changing a value in `DEFAULT_SETTINGS` only affects fresh installs. The store
   merges `{ ...DEFAULT_SETTINGS, ...stored }`, so a saved blob wins. To push new
   defaults to existing devices, bump `SETTINGS_VERSION` (the storage key derives
@@ -82,9 +104,9 @@ verified on a real device.
   `digitofono.userPresets.v1`, separate from the settings blob. They store a
   `ToneState` snapshot, never the short-axis assignment or global settings. Saving
   a name that already exists updates that preset instead of duplicating it.
-- A v2 settings blob from before this overhaul has only `preset`. `load()` must
-  hydrate the tone fields from that preset (`PRESETS[parsed.preset].values`) before
-  applying `...parsed`, or a saved Bell silently loads warm's cutoff and morph.
+- A settings blob that only has `preset` still needs its tone fields hydrated
+  from that preset (`PRESETS[parsed.preset].values`) before applying `...parsed`,
+  or a saved Bell silently loads warm's cutoff and morph.
 - The harmony graph is built whenever the harmony axis is selected, even at
   `shortPos = 0` where every level is silent, so it can fade in as the finger
   moves. It is also built off-axis when a fixed harmony amount is > 0. Checking

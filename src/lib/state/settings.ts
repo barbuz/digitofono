@@ -18,8 +18,8 @@ function load(): Settings {
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<Settings>;
     if (parsed.version !== SETTINGS_VERSION) return { ...DEFAULT_SETTINGS };
-    // Older blobs stored only the preset id. Hydrate the new tone fields from
-    // that preset instead of from the default, or a saved Bell would load warm.
+    // A blob with only the preset id needs its tone fields hydrated from that
+    // preset, or a saved Bell would load warm's cutoff and morph.
     const storedTone = isPresetId(parsed.preset) ? PRESETS[parsed.preset].values : DEFAULT_TONE;
     return { ...DEFAULT_SETTINGS, ...storedTone, ...parsed };
   } catch {

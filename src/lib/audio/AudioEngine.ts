@@ -1,9 +1,6 @@
 import { Voice } from './Voice';
 import { buildPeriodicWave, buildImpulseResponse, harmonicTable } from './waves';
-import { DEFAULT_TONE, type ToneState } from '../state/schema';
-
-/** The four harmonic-table controls a preset can set. */
-export type WaveShape = Pick<ToneState, 'darkTilt' | 'darkEven' | 'brightTilt' | 'brightEven'>;
+import { DEFAULT_TONE, type WaveShape } from '../state/schema';
 
 /**
  * Global pitch vibrato. `detune` is in cents and independent of frequency, so
@@ -52,6 +49,8 @@ export class AudioEngine {
   private waveShape: WaveShape = DEFAULT_TONE;
   private waveDark: PeriodicWave | null = null;
   private waveBright: PeriodicWave | null = null;
+  private waveKey = '';
+  private readonly waveCache = new Map<string, { dark: PeriodicWave; bright: PeriodicWave }>();
 
   // Settings arrive from the Player constructor, before the context exists.
   // Storing them lets `init` apply the real values instead of the hardcoded
@@ -180,28 +179,65 @@ export class AudioEngine {
   }
 
   private buildWaveTables(): void {
-    if (!this.ctx) return;
-    this.waveDark = buildPeriodicWave(
-      this.ctx,
-      harmonicTable(this.waveShape.darkTilt, this.waveShape.darkEven),
-    );
-    this.waveBright = buildPeriodicWave(
-      this.ctx,
-      harmonicTable(this.waveShape.brightTilt, this.waveShape.brightEven),
-    );
+    this.wavesFor(this.waveShape);
+  }
+
+  /**
+   * Periodic waves for a harmonic shape, cached by the shape itself. Voices can
+   * hold different shapes at the same time, so the engine cannot expose only
+   * one pair: the Player asks for the pair its touch resolved and hands it to
+   * that voice.
+   */
+  wavesFor(shape: WaveShape): { dark: PeriodicWave; bright: PeriodicWave } | null {
+    if (!this.ctx) return null;
+
+    const quantized = AudioEngine.quantize(shape);
+    const key = AudioEngine.waveKeyFor(quantized);
+    if (key === this.waveKey && this.waveDark && this.waveBright) {
+      return { dark: this.waveDark, bright: this.waveBright };
+    }
+
+    const cached = this.waveCache.get(key);
+    if (cached) {
+      this.waveDark = cached.dark;
+      this.waveBright = cached.bright;
+      this.waveKey = key;
+      return cached;
+    }
+
+    const waves = {
+      dark: buildPeriodicWave(this.ctx, harmonicTable(quantized.darkTilt, quantized.darkEven)),
+      bright: buildPeriodicWave(
+        this.ctx,
+        harmonicTable(quantized.brightTilt, quantized.brightEven),
+      ),
+    };
+    if (this.waveCache.size >= 512) this.waveCache.clear();
+    this.waveCache.set(key, waves);
+    this.waveDark = waves.dark;
+    this.waveBright = waves.bright;
+    this.waveKey = key;
+    return waves;
+  }
+
+  private static quantize(shape: WaveShape): WaveShape {
+    return {
+      darkTilt: Math.round(shape.darkTilt * 100) / 100,
+      darkEven: Math.round(shape.darkEven * 100) / 100,
+      brightTilt: Math.round(shape.brightTilt * 100) / 100,
+      brightEven: Math.round(shape.brightEven * 100) / 100,
+    };
+  }
+
+  private static waveKeyFor(shape: WaveShape): string {
+    return [shape.darkTilt, shape.darkEven, shape.brightTilt, shape.brightEven]
+      .map((value) => value.toFixed(2))
+      .join('|');
   }
 
   setWaveShape(shape: WaveShape): void {
-    if (
-      this.waveShape.darkTilt === shape.darkTilt &&
-      this.waveShape.darkEven === shape.darkEven &&
-      this.waveShape.brightTilt === shape.brightTilt &&
-      this.waveShape.brightEven === shape.brightEven
-    ) {
-      return;
-    }
     this.waveShape = { ...shape };
-    if (this.ctx) this.buildWaveTables();
+    if (this.ctx) this.wavesFor(this.waveShape);
   }
 
   setMasterVolume(value: number): void {

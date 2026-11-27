@@ -100,6 +100,20 @@ describe('AudioEngine voice pool', () => {
     expect(bright.imag[1]).toBeGreaterThan(bright.imag[2]);
   });
 
+  it('caches wave pairs per harmonic shape', async () => {
+    const { engine } = makeEngine();
+    await engine.ensureRunning();
+    const shape = { darkTilt: 1.4, darkEven: 0.3, brightTilt: 2.2, brightEven: 0.8 };
+
+    const first = engine.wavesFor(shape)!;
+    const second = engine.wavesFor({ ...shape })!;
+    const different = engine.wavesFor({ ...shape, darkTilt: 0.6 })!;
+
+    expect(first.dark).toBe(second.dark);
+    expect(first.bright).toBe(second.bright);
+    expect(different.dark).not.toBe(first.dark);
+  });
+
   it('steals an existing voice instead of allocating beyond the cap', async () => {
     const { engine } = makeEngine();
     await engine.ensureRunning();
