@@ -559,7 +559,7 @@ interface Settings extends ToneState {
   octaveSpan: number;      // default 3
   scale: Scale;            // default 'chromatic'
   snapStrength: number;    // 0..1, default 0.2
-  shortAxis: ShortAxis;    // default 'timbre'
+  shortAxis: ShortAxis;    // default 'harmony'
   harmonyVoicing: HarmonyVoicing;
   volume: number;          // master 0..1, default 0.8; setup-only
   reverbAmount: number;    // 0..1, default 0.12
@@ -586,12 +586,13 @@ Built-in presets: `warm` (default, warm/glassy), `hollow` (clarinet-ish),
 `bell`, `pad` (slow attack), `pluck` (kalimba-ish).
 
 Settings panel: preset dropdown (built-ins plus saved presets, with a custom-save
-field), per-parameter tone rows with an Axis radio, filter resonance, envelope
-sliders, wave-shape controls (harmonic morph plus dark/bright table sliders),
-scale, base note, snap strength, reverb, ensemble, vibrato, a **Global setup**
-section for octave span, master volume and scale-line opacity, microphone
-listening, and song scale import. Every slider has an info button that reveals a
-plain-language description.
+field), then **Global setup** first: scale, base note, octave span, master volume
+and scale-line opacity. The tone rows follow, with Harmony (chord) first and the
+default short axis. Filter resonance, the envelope sliders, and the performance
+controls (snap strength, reverb, ensemble, vibrato) come next. Wave shape is the
+last section: harmonic morph plus the dark/bright table sliders. Microphone
+listening and song scale import follow. Every slider has an info button that
+reveals a plain-language description.
 
 ---
 
@@ -619,7 +620,7 @@ Pure-function coverage is where real bugs hide:
 - `params.ts`: stored values for non-axis parameters; the selected axis overrides
   only its own value; fixed harmony produces chord gains; filter, envelope, wave
   shape, pitch and global targets resolve from the axis.
-- Settings persistence: older blobs hydrate tone values from their stored preset;
+- Settings persistence: blobs that only carry a preset hydrate tone values from it;
   editing a tone value sets the preset to `custom`; applying a preset copies every
   tone value.
 - User presets: save, rename-by-name update, delete, and reload from storage.

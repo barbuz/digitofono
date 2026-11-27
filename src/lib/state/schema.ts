@@ -84,7 +84,7 @@ export interface Settings extends ToneState {
   preset: PresetSelection;
 }
 
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 /** The warm preset's values, which are also the fresh-install defaults. */
 export const DEFAULT_TONE: ToneState = {
@@ -110,7 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
   octaveSpan: 3,
   scale: 'chromatic',
   snapStrength: 0.2,
-  shortAxis: 'timbre',
+  shortAxis: 'harmony',
   harmonyVoicing: 'diatonic',
   volume: 0.8,
   reverbAmount: 0.12,

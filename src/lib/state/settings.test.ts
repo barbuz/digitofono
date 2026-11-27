@@ -34,11 +34,12 @@ describe('settings persistence', () => {
   });
 
   it('discards settings saved by an older version', async () => {
-    // A v1 blob with the old defaults; the version bump must ignore it so the
-    // new defaults actually reach a device that has played before.
+    // A v2 blob with the old default axis; the version bump must ignore it so
+    // the new defaults actually reach a device that has played before.
     installStorage({
-      'digitofono.settings.v1': JSON.stringify({
-        version: 1,
+      'digitofono.settings.v2': JSON.stringify({
+        version: 2,
+        shortAxis: 'timbre',
         ensemble: 0.3,
         snapStrength: 0.6,
         scaleLines: 0,
@@ -46,6 +47,7 @@ describe('settings persistence', () => {
     });
 
     const { getSettings } = await loadStore();
+    expect(getSettings().shortAxis).toBe('harmony');
     expect(getSettings().ensemble).toBe(0.75);
     expect(getSettings().snapStrength).toBe(0.2);
     expect(getSettings().scaleLines).toBe(0.5);
@@ -53,7 +55,7 @@ describe('settings persistence', () => {
 
   it('keeps settings saved by the current version', async () => {
     installStorage({
-      'digitofono.settings.v2': JSON.stringify({ version: 2, ensemble: 0.1, volume: 0.42 }),
+      'digitofono.settings.v3': JSON.stringify({ version: 3, ensemble: 0.1, volume: 0.42 }),
     });
 
     const { getSettings } = await loadStore();
@@ -64,10 +66,10 @@ describe('settings persistence', () => {
   });
 
   it('fills in a newly added field from the defaults without a version bump', async () => {
-    // A v2 blob written before `harmonyVoicing` existed. The additive field must
-    // fall back to the default via the merge, so the version need not move.
+    // A current-version blob that omits `harmonyVoicing`. The additive field
+    // must fall back to the default via the merge.
     installStorage({
-      'digitofono.settings.v2': JSON.stringify({ version: 2, shortAxis: 'harmony' }),
+      'digitofono.settings.v3': JSON.stringify({ version: 3, shortAxis: 'harmony' }),
     });
 
     const { getSettings } = await loadStore();
@@ -77,11 +79,11 @@ describe('settings persistence', () => {
     expect(getSettings().listen).toBe(false);
   });
 
-  it('hydrates tone values from the saved preset for an older blob', async () => {
-    // A blob from before tone values moved into settings. It only knows the
-    // preset id, so the new fields must come from that preset, not from warm.
+  it('hydrates tone values from the saved preset when tone fields are absent', async () => {
+    // A blob that only knows the preset id must take its tone fields from that
+    // preset, not from warm.
     installStorage({
-      'digitofono.settings.v2': JSON.stringify({ version: 2, preset: 'bell' }),
+      'digitofono.settings.v3': JSON.stringify({ version: 3, preset: 'bell' }),
     });
 
     const { getSettings } = await loadStore();

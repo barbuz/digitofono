@@ -343,14 +343,78 @@
       <span class="hint">{saveStatus}</span>
     {/if}
 
-    <h3>Tone</h3>
+    <h3>Global setup</h3>
 
-    {@render sliderRow(
-      'timbre',
-      settings.timbre,
-      (e) => setTone('timbre', Number(e.currentTarget.value)),
-      `${Math.round(timbreHzForPosition(settings.timbre))} Hz`,
+    <label>
+      Scale
+      <select
+        value={settings.scale}
+        onchange={(e) => updateSettings({ scale: (e.currentTarget.value as ScaleId) })}
+      >
+        {#each SCALE_IDS as id}
+          <option value={id}>{SCALE_LABELS[id]}</option>
+        {/each}
+      </select>
+    </label>
+
+    <label>
+      Base note
+      <select
+        value={settings.baseMidi}
+        onchange={(e) => updateSettings({ baseMidi: Number(e.currentTarget.value) })}
+      >
+        {#each baseNoteOptions as option}
+          <option value={option.midi}>{option.label}</option>
+        {/each}
+      </select>
+    </label>
+
+    {#if song}
+      <div class="song">
+        <div class="song-head">
+          <strong>{song.label}</strong>
+          <span class="hint">
+            {Math.round(song.confidence * 100)}% confident · {song.pitchClasses.length} notes
+          </span>
+        </div>
+        <span class="hint">
+          {song.pitchClasses.map((pc) => NOTE_NAMES[pc]).join(' ')} ·
+          {midiToNoteName(song.lowMidi)}–{midiToNoteName(song.highMidi)}
+          {#if Math.abs(song.tuningCents) >= 5}
+            · tuning {song.tuningCents > 0 ? '+' : ''}{song.tuningCents}¢
+          {/if}
+        </span>
+        {#if song.candidates.length > 1}
+          <span class="hint">
+            also possible: {song.candidates
+              .slice(1)
+              .map((candidate) => candidate.label)
+              .join(', ')}
+          </span>
+        {/if}
+        <button class="song-clear" onclick={clearSong}>Back to {SCALE_LABELS[settings.scale]}</button>
+      </div>
+    {/if}
+
+    {@render setupSliderRow(
+      'octaveSpan',
+      settings.octaveSpan,
+      `Octaves: ${settings.octaveSpan.toFixed(1)}`,
     )}
+
+    {@render setupSliderRow(
+      'masterVolume',
+      settings.volume,
+      `Master volume: ${Math.round(settings.volume * 100)}%`,
+    )}
+
+    {@render setupSliderRow(
+      'scaleLines',
+      settings.scaleLines,
+      `Scale lines: ${Math.round(settings.scaleLines * 100)}%`,
+    )}
+
+    <h3>Tone</h3>
 
     <div class="tone-row" class:active={settings.shortAxis === 'harmony'}>
       <div class="tone-head">
@@ -397,6 +461,13 @@
     </div>
 
     {@render sliderRow(
+      'timbre',
+      settings.timbre,
+      (e) => setTone('timbre', Number(e.currentTarget.value)),
+      `${Math.round(timbreHzForPosition(settings.timbre))} Hz`,
+    )}
+
+    {@render sliderRow(
       'volume',
       settings.voiceLevel,
       (e) => setTone('voiceLevel', Number(e.currentTarget.value)),
@@ -440,6 +511,36 @@
       `${settings.release.toFixed(3)} s`,
     )}
 
+    <h3>Performance</h3>
+
+    {@render sliderRow(
+      'snapStrength',
+      settings.snapStrength,
+      handleNumber('snapStrength'),
+      `${settings.snapStrength.toFixed(2)} · 0 = free glide; higher corrects small errors, still free between notes`,
+    )}
+
+    {@render sliderRow(
+      'reverb',
+      settings.reverbAmount,
+      handleNumber('reverbAmount'),
+      `${Math.round(settings.reverbAmount * 100)}%`,
+    )}
+
+    {@render sliderRow(
+      'ensemble',
+      settings.ensemble,
+      handleNumber('ensemble'),
+      `${Math.round(settings.ensemble * 100)}% · detuned chorus; blurs the pitch`,
+    )}
+
+    {@render sliderRow(
+      'vibrato',
+      settings.vibrato,
+      handleNumber('vibrato'),
+      `${Math.round(settings.vibrato * 100)}% · pitch movement; softens tuning errors`,
+    )}
+
     <h3>Wave shape</h3>
 
     <span class="hint">
@@ -480,107 +581,6 @@
       settings.brightEven,
       (e) => setTone('brightEven', Number(e.currentTarget.value)),
       `${Math.round(settings.brightEven * 100)}%`,
-    )}
-
-    {#if song}
-      <div class="song">
-        <div class="song-head">
-          <strong>{song.label}</strong>
-          <span class="hint">
-            {Math.round(song.confidence * 100)}% confident · {song.pitchClasses.length} notes
-          </span>
-        </div>
-        <span class="hint">
-          {song.pitchClasses.map((pc) => NOTE_NAMES[pc]).join(' ')} ·
-          {midiToNoteName(song.lowMidi)}–{midiToNoteName(song.highMidi)}
-          {#if Math.abs(song.tuningCents) >= 5}
-            · tuning {song.tuningCents > 0 ? '+' : ''}{song.tuningCents}¢
-          {/if}
-        </span>
-        {#if song.candidates.length > 1}
-          <span class="hint">
-            also possible: {song.candidates
-              .slice(1)
-              .map((candidate) => candidate.label)
-              .join(', ')}
-          </span>
-        {/if}
-        <button class="song-clear" onclick={clearSong}>Back to {SCALE_LABELS[settings.scale]}</button>
-      </div>
-    {/if}
-
-    <label>
-      Scale
-      <select
-        value={settings.scale}
-        onchange={(e) => updateSettings({ scale: (e.currentTarget.value as ScaleId) })}
-      >
-        {#each SCALE_IDS as id}
-          <option value={id}>{SCALE_LABELS[id]}</option>
-        {/each}
-      </select>
-    </label>
-
-    <label>
-      Base note
-      <select
-        value={settings.baseMidi}
-        onchange={(e) => updateSettings({ baseMidi: Number(e.currentTarget.value) })}
-      >
-        {#each baseNoteOptions as option}
-          <option value={option.midi}>{option.label}</option>
-        {/each}
-      </select>
-    </label>
-
-    <h3>Performance</h3>
-
-    {@render sliderRow(
-      'snapStrength',
-      settings.snapStrength,
-      handleNumber('snapStrength'),
-      `${settings.snapStrength.toFixed(2)} · 0 = free glide; higher corrects small errors, still free between notes`,
-    )}
-
-    {@render sliderRow(
-      'reverb',
-      settings.reverbAmount,
-      handleNumber('reverbAmount'),
-      `${Math.round(settings.reverbAmount * 100)}%`,
-    )}
-
-    {@render sliderRow(
-      'ensemble',
-      settings.ensemble,
-      handleNumber('ensemble'),
-      `${Math.round(settings.ensemble * 100)}% · detuned chorus; blurs the pitch`,
-    )}
-
-    {@render sliderRow(
-      'vibrato',
-      settings.vibrato,
-      handleNumber('vibrato'),
-      `${Math.round(settings.vibrato * 100)}% · pitch movement; softens tuning errors`,
-    )}
-
-    <h3>Global setup</h3>
-
-    {@render setupSliderRow(
-      'octaveSpan',
-      settings.octaveSpan,
-      `Octaves: ${settings.octaveSpan.toFixed(1)}`,
-    )}
-
-    {@render setupSliderRow(
-      'masterVolume',
-      settings.volume,
-      `Master volume: ${Math.round(settings.volume * 100)}%`,
-    )}
-
-    {@render setupSliderRow(
-      'scaleLines',
-      settings.scaleLines,
-      `Scale lines: ${Math.round(settings.scaleLines * 100)}%`,
     )}
 
     <label class="toggle">
