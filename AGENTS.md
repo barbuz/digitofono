@@ -49,16 +49,17 @@ verified on a real device.
   every other value stays stored. `SettingsPanel` reads those extents from the
   target instead of repeating them at each call site. The four original ids
   (`timbre`, `harmonicMorph`, `harmony`, `volume`) are kept because they are
-  persisted; `volume` means the
-  per-note level (`voiceLevel`), not master volume. Envelope targets are sampled
-  at note start (release at lift); sustain also follows live after decay. Wave
-  shape is per voice: `AudioEngine.wavesFor(shape)` returns cached wave pairs and
-  `Voice.setWaves` swaps them under a held note. Global targets (master volume,
-  reverb, ensemble, vibrato) are last-touch-wins; `snapStrength` is applied per
-  touch. Octave span and scale-line opacity are setup parameters for the playing
-  surface, not axis targets: keep them out of `SHORT_AXIS_IDS` and always read
-  their stored values in `PlaySurface`. Do not reintroduce a fixed four-value
-  union.
+  persisted; the `volume` id means the per-note level (`voiceLevel`), not master
+  volume. Envelope targets are sampled at note start (release at lift); sustain
+  also follows live after decay. Wave shape is per voice:
+  `AudioEngine.wavesFor(shape)` returns cached wave pairs and
+  `Voice.setWaves` swaps them under a held note. Global targets (reverb,
+  ensemble, vibrato) are last-touch-wins; `snapStrength` is applied per touch.
+  Master volume, octave span and scale-line opacity are setup parameters, not
+  axis targets: keep them out of `SHORT_AXIS_IDS`, apply master volume from
+  stored settings in `Player.applySettings`, and always read octave span and
+  scale-line opacity from stored settings in `PlaySurface`. Do not reintroduce a
+  fixed four-value union.
 - Changing a value in `DEFAULT_SETTINGS` only affects fresh installs. The store
   merges `{ ...DEFAULT_SETTINGS, ...stored }`, so a saved blob wins. To push new
   defaults to existing devices, bump `SETTINGS_VERSION` (the storage key derives

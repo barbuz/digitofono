@@ -37,7 +37,7 @@ iOS parity (Android + desktop browsers first; iOS is a stretch target).
 |---|----------|--------|
 | 1 | Interaction model | **Both**: quick tap = plucked note; press-and-hold = sustained gliding tone |
 | 2 | Pitch quantization | **Soft snap to scale**, strength adjustable 0.0–1.0 (0 = fully free glide) |
-| 3 | Short axis | **User-selectable** between every numeric performance slider: the tone controls, envelope, wave shape, and snap strength, master volume, reverb, ensemble and vibrato. Octave span and scale-line opacity are setup-only, not axis targets |
+| 3 | Short axis | **User-selectable** between every numeric performance slider: the tone controls, envelope, wave shape, and snap strength, reverb, ensemble and vibrato. Master volume, octave span and scale-line opacity are setup-only, not axis targets |
 | 4 | Primary target | **Android Chrome** first; desktop browsers for development |
 | 5 | Visuals | Near-blank + **ripple/glow at each touch point** and a pitch indicator |
 | 6 | Rotation | **Locked at load** — no runtime orientation handling; **portrait** |
@@ -308,9 +308,9 @@ harmony amount, filter resonance or envelope can sit under a swept parameter.
 
 The first four mappings are the original tone controls (§7.1–7.4). The same
 mechanism also covers filter resonance, the envelope sliders, the four wave-shape
-sliders, and the performance controls (snap strength, master volume, reverb,
-ensemble and vibrato). Octave span and scale-line opacity are setup parameters
-for the playing surface, not axis targets. Each target declares its own range,
+sliders, and the performance controls (snap strength, reverb, ensemble and
+vibrato). Master volume, octave span and scale-line opacity are setup
+parameters, not axis targets. Each target declares its own range,
 slider step and curve in `mapping/shortAxis.ts`; the settings panel reads those
 extents from the target rather than repeating them. Time targets sweep
 logarithmically, matching their sliders.
@@ -395,17 +395,19 @@ fullAt_i    = FULL_AT + (1 - FULL_AT) * (d_i - nearest) / (farthest - nearest)
 noteLevels[i] = clamp01(shortPos / fullAt_i)
 ```
 
-### 7.4 Volume
+### 7.4 Note level
 
-Perceptual (roughly equal-loudness) curve rather than raw amplitude:
+Per-note level, not the master output. Perceptual (roughly equal-loudness)
+curve rather than raw amplitude:
 
 ```
 gain = (shortPos^2)          // simple perceptual approximation, 0..1
 // or dB: gainDb = lerp(-60, 0, shortPos); gain = 10^(gainDb/20)
 ```
 
-Note: there is no natural "neutral" position for volume; whichever end the finger
-rests at is the level. Documented behaviour.
+Note: there is no natural "neutral" position for note level; whichever end the
+finger rests at is the level. Master volume remains a separate setup-only output
+control. Documented behaviour.
 
 ### 7.5 Non-selected parameters
 
@@ -417,12 +419,11 @@ swept timbre.
 - Timbre → stored position on the 300–8000 Hz exponential cutoff curve.
 - Harmonic morph → stored crossfade, 0..1.
 - Harmony → stored chord amount, 0..1 (0 = bare note).
-- Touch volume → stored per-note level, 0..1 (separate from the master volume).
+- Note level → stored per-note level, 0..1 (separate from the master volume).
 - Filter resonance, envelope, and wave shape → their stored slider values.
-- Snap strength, master volume, reverb, ensemble and vibrato → their stored
-  slider values.
-- Octave span and scale-line opacity → setup-only; always use their stored
-  values and cannot be assigned to the axis.
+- Snap strength, reverb, ensemble and vibrato → their stored slider values.
+- Master volume, octave span and scale-line opacity → setup-only; always use
+  their stored values and cannot be assigned to the axis.
 
 Editing any tone value (anything in `ToneState`) sets the preset selection to
 `custom`. Global performance values are not part of a preset snapshot.
@@ -538,7 +539,7 @@ Persisted to `localStorage` (single JSON blob, versioned). Types:
 
 ```ts
 type Scale = 'chromatic' | 'major' | 'minor' | 'majorPentatonic' | ...;
-type ShortAxis = 'timbre' | 'harmonicMorph' | 'harmony' | 'volume';
+type ShortAxis = ShortAxisId; // every performance slider; see mapping/shortAxis.ts
 type PresetSelection = PresetId | 'custom' | `user:${string}`;
 
 interface ToneState {
@@ -560,7 +561,7 @@ interface Settings extends ToneState {
   snapStrength: number;    // 0..1, default 0.2
   shortAxis: ShortAxis;    // default 'timbre'
   harmonyVoicing: HarmonyVoicing;
-  volume: number;          // master 0..1, default 0.8
+  volume: number;          // master 0..1, default 0.8; setup-only
   reverbAmount: number;    // 0..1, default 0.12
   ensemble: number;        // 0..1, default 0.75
   vibrato: number;         // 0..1, default 0.2
@@ -606,7 +607,7 @@ Pure-function coverage is where real bugs hide:
   (A4=440, C4≈261.63).
 - `scales.ts`: each scale's pitch-class sets are correct.
 - `shortAxis.ts`: exponential timbre mapping monotonic; morph gains sum to 1;
-  volume curve monotonic; every axis target maps its declared range, with log
+  note-level curve monotonic; every axis target maps its declared range, with log
   targets sweeping exponentially and all targets clamping.
 - `harmony.ts`: diatonic intervals snapped into every scale, `major`/`octaves`
   voicings scale-independent, stack strictly ascending for every voicing; fade-in
@@ -668,7 +669,8 @@ span; note-name display; tap-vs-hold classification; multi-touch polyphony; voic
 stealing.
 
 **Phase 3 — Timbre & short axis.** Harmonic-morph engine (dual PeriodicWave
-crossfade); assignable short axis (timbre / morph / harmony / volume); presets
+crossfade); assignable short axis (every performance slider; master volume and
+setup sliders excluded); presets
 (`hollow`, `bell`, `pad`, `pluck`).
 
 **Phase 4 — Practice features.** Recording/looping
@@ -687,8 +689,9 @@ accessibility, touch calibration.
    finger moves and stops on lift.
 3. Pitch is logarithmic across the long axis; with snapping on, notes are reliably
    in tune; with strength 0, pitch is fully free.
-4. The short axis is switchable between timbre, harmonic morph, harmony and volume,
-   and the change is audible live.
+4. The short axis is switchable between every performance slider, and the change
+   is audible live. Master volume, octave span and scale-line opacity are
+   setup-only and cannot be assigned.
 5. Up to 8 simultaneous voices with no dropouts, stuck notes, or clipping.
 6. Ripples/glow render at ~60 fps.
 7. Works offline and is installable; screen stays awake while playing.

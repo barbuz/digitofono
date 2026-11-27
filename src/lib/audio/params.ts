@@ -24,7 +24,6 @@ export interface AxisValues {
   envelope: Envelope;
   waveShape: WaveShape;
   snapStrength: number;
-  masterVolume: number;
   reverbAmount: number;
   ensemble: number;
   vibrato: number;
@@ -70,7 +69,6 @@ export function resolveAxes(settings: Settings, shortPos: number): AxisValues {
       brightEven: resolved.brightEven,
     },
     snapStrength: resolved.snapStrength,
-    masterVolume: resolved.volume,
     reverbAmount: resolved.reverbAmount,
     ensemble: resolved.ensemble,
     vibrato: resolved.vibrato,

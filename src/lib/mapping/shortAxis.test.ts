@@ -126,6 +126,7 @@ describe('axisValueForPosition', () => {
 
 describe('short-axis target list', () => {
   it('keeps setup-only sliders out of the axis choices', () => {
+    expect(SHORT_AXIS_IDS).not.toContain('masterVolume');
     expect(SHORT_AXIS_IDS).not.toContain('octaveSpan');
     expect(SHORT_AXIS_IDS).not.toContain('scaleLines');
   });

@@ -355,7 +355,7 @@
       'volume',
       settings.voiceLevel,
       (e) => setTone('voiceLevel', Number(e.currentTarget.value)),
-      `${Math.round(settings.voiceLevel * 100)}%`,
+      `${Math.round(settings.voiceLevel * 100)}% · per-note level; saved with the preset`,
     )}
 
     {@render sliderRow(
@@ -495,11 +495,14 @@
       `${settings.snapStrength.toFixed(2)} · 0 = free glide; higher corrects small errors, still free between notes`,
     )}
 
-    {@render sliderRow(
-      'masterVolume',
+    {@render plainSliderRow(
+      `Master volume: ${Math.round(settings.volume * 100)}%`,
       settings.volume,
+      0,
+      1,
+      0.02,
       handleNumber('volume'),
-      `${Math.round(settings.volume * 100)}%`,
+      'overall output; not saved with presets',
     )}
 
     {@render sliderRow(

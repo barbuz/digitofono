@@ -76,6 +76,7 @@ class RecordingVoice {
 class RecordingEngine {
   voices: RecordingVoice[] = [];
   masterVolumes: number[] = [];
+  reverbAmounts: number[] = [];
   private pool: RecordingVoice[] = [];
 
   ensureRunning(): Promise<void> {
@@ -112,7 +113,9 @@ class RecordingEngine {
   setMasterVolume(value: number): void {
     this.masterVolumes.push(value);
   }
-  setReverbAmount(): void {}
+  setReverbAmount(value: number): void {
+    this.reverbAmounts.push(value);
+  }
   setEnsemble(): void {}
   setVibrato(): void {}
 }
@@ -352,12 +355,22 @@ describe('Player generalized axis wiring', () => {
   });
 
   it('applies a global axis value to the engine', () => {
-    const { engine, player } = makeAxisPlayer({ shortAxis: 'masterVolume' });
-    engine.masterVolumes.length = 0;
+    const { engine, player } = makeAxisPlayer({ shortAxis: 'reverb' });
+    engine.reverbAmounts.length = 0;
 
     player.pointerDown(1, 400, 400);
 
-    expect(engine.masterVolumes.at(-1)).toBeCloseTo(1, 9);
+    expect(engine.reverbAmounts.at(-1)).toBeCloseTo(1, 9);
+  });
+
+  it('applies master volume from settings, never from the axis', () => {
+    const { engine, player } = makeAxisPlayer({ volume: 0.3 });
+    expect(engine.masterVolumes.at(-1)).toBeCloseTo(0.3, 9);
+
+    engine.masterVolumes.length = 0;
+    player.pointerDown(1, 400, 400);
+
+    expect(engine.masterVolumes).toHaveLength(0);
   });
 
   it('drives sustain live once the note has passed its decay', () => {

@@ -4,7 +4,8 @@ import { clamp01 } from './pitch';
  * The numeric performance sliders that can be the short-axis variable. The
  * first four are the tone controls that were always assignable; the rest extend
  * the same idea to the envelope, wave shape and global performance controls.
- * Setup-only sliders such as octave span and scale-line opacity stay out.
+ * Setup-only sliders such as master volume, octave span and scale-line opacity
+ * stay out.
  */
 export type ShortAxisId =
   | 'timbre'
@@ -21,7 +22,6 @@ export type ShortAxisId =
   | 'brightTilt'
   | 'brightEven'
   | 'snapStrength'
-  | 'masterVolume'
   | 'reverb'
   | 'ensemble'
   | 'vibrato';
@@ -42,7 +42,6 @@ export type AxisField =
   | 'brightTilt'
   | 'brightEven'
   | 'snapStrength'
-  | 'volume'
   | 'reverbAmount'
   | 'ensemble'
   | 'vibrato';
@@ -74,7 +73,6 @@ export const SHORT_AXIS_IDS: ShortAxisId[] = [
   'brightTilt',
   'brightEven',
   'snapStrength',
-  'masterVolume',
   'reverb',
   'ensemble',
   'vibrato',
@@ -121,7 +119,7 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
   },
   volume: {
     id: 'volume',
-    label: 'Touch volume',
+    label: 'Note level',
     field: 'voiceLevel',
     min: 0,
     max: 1,
@@ -217,15 +215,6 @@ export const AXIS_TARGETS: Record<ShortAxisId, AxisTarget> = {
     max: 1,
     curve: 'linear',
     step: 0.05,
-  },
-  masterVolume: {
-    id: 'masterVolume',
-    label: 'Master volume',
-    field: 'volume',
-    min: 0,
-    max: 1,
-    curve: 'linear',
-    step: 0.02,
   },
   reverb: {
     id: 'reverb',

@@ -265,9 +265,6 @@ export class Player {
    */
   private applyAxisGlobals(axes: AxisValues): void {
     switch (this.settings.shortAxis) {
-      case 'masterVolume':
-        this.engine.setMasterVolume(axes.masterVolume);
-        break;
       case 'reverb':
         this.engine.setReverbAmount(axes.reverbAmount);
         break;

@@ -110,26 +110,26 @@ describe('resolveAxes generalized targets', () => {
 
   it('resolves global targets', () => {
     const settings = settingsWith({
-      shortAxis: 'masterVolume',
+      shortAxis: 'reverb',
       snapStrength: 0.4,
       volume: 0.3,
       reverbAmount: 0.2,
     });
     const axes = resolveAxes(settings, 1);
-    expect(axes.masterVolume).toBeCloseTo(1, 9);
+    expect(axes.reverbAmount).toBeCloseTo(1, 9);
     expect(axes.snapStrength).toBeCloseTo(0.4, 9);
-    expect(axes.reverbAmount).toBeCloseTo(0.2, 9);
   });
 
   it('leaves every other value at its stored setting', () => {
     const settings = settingsWith({
-      shortAxis: 'masterVolume',
+      shortAxis: 'reverb',
       timbre: 0.4,
       morph: 0.6,
       voiceLevel: 0.8,
       harmony: 0.3,
       filterQ: 1.4,
       attack: 0.2,
+      reverbAmount: 0.2,
     });
     const axes = resolveAxes(settings, 0.5);
     expect(axes.cutoffHz).toBeCloseTo(shortAxisToCutoff(0.4), 6);
@@ -138,6 +138,6 @@ describe('resolveAxes generalized targets', () => {
     expect(axes.harmony).toEqual(harmonyGains(0.3, 'diatonic'));
     expect(axes.filterQ).toBeCloseTo(1.4, 9);
     expect(axes.envelope.attack).toBeCloseTo(0.2, 9);
-    expect(axes.masterVolume).toBeCloseTo(0.5, 9);
+    expect(axes.reverbAmount).toBeCloseTo(0.5, 9);
   });
 });
